@@ -1,0 +1,96 @@
+#!/usr/bin/sh
+ 
+CACHE_DIR="/tmp/swaystatus"
+DATA_FILE="$CACHE_DIR/swaystatus_airquality"
+mkdir -p "$CACHE_DIR"
+
+# Ensure file exists for inotifywait, but don't overwrite if it has content
+if [ ! -f "$DATA_FILE" ]; then
+    touch "$DATA_FILE"
+fi
+
+function get_formatted_air_quality() {
+	export DATA_FILE="$DATA_FILE"
+	python3 -c '
+import sys, json, os
+
+data_file = os.environ.get("DATA_FILE")
+
+# Defaults
+p, n, co = -1, -1, -1
+pc, nc, coc = "⚪", "⚪", "⚪"
+name = "Loading..."
+
+def get_color(v):
+    return "⚪" if v<=0 else "🔵" if v<=25 else "🟢" if v<=50 else "🟡" if v<=100 else "🟠" if v<=150 else "🔴" if v<=200 else "🟣" if v<=300 else "🟤"
+
+try:
+    if data_file and os.path.exists(data_file):
+        with open(data_file, "r") as f:
+            full_data = json.load(f)["data"]
+            d = full_data["iaqi"]
+            # Extract name from "city": {"name": "Beijing (北京)"}
+            # We split by "(" to get just "Beijing " and strip whitespace
+            full_name = full_data.get("city", {}).get("name", "Unknown")
+            point_name = full_name.split("(")[0].strip()
+        
+        pv = d.get("pm25",{}).get("v",0)
+        nv = d.get("no2",{}).get("v",0)
+        cv = d.get("co",{}).get("v",0)
+        
+        p, pc = pv, get_color(pv)
+        n, nc = nv, get_color(nv)
+        co, coc = cv, get_color(cv)
+        name = point_name
+except:
+    pass
+
+print(f"{name}: PM2.5 {pc}{p} NO2 {nc}{n} CO {coc}{co}")
+'
+}
+
+function get_battery_info()
+{
+	battery="/sys/class/power_supply/BAT0/"
+	[[ ! -d "$battery" ]] && echo -n "No battery?" && exit;
+
+	info=''
+	now=$(expr $(<"$battery/energy_now") \* 100 / $(<"$battery/energy_full_design"))
+
+	state=$(cat "$battery/status")
+	case "$state" in
+		Full)
+		state="🔋"
+		;;
+
+		Discharging)
+		state="♻️"
+		;;
+
+		Charging|Unknown)
+		state="⚡"
+		;;
+	esac
+
+	echo -n "$state$now%"
+}
+
+# Start the fetcher daemon
+# Kill existing instances to avoid duplicates
+pkill -f swaystatus_aqi.py 2>/dev/null
+$HOME/.local/bin/swaystatus_aqi.py &
+
+# Just to refresh the status bar at start
+$HOME/.local/bin/upvolstatus
+touch /tmp/power_changed_event
+
+while :
+do
+	aqi_line=$(get_formatted_air_quality)
+	volume_line=$(</tmp/sound_changed_event)
+	battery_level=$(get_battery_info)
+	date=$(date "+%d %b %Y %H:%M")
+	echo "$aqi_line | $battery_level | $volume_line | $date"
+
+	inotifywait -e modify -t 30 /tmp/power_changed_event /tmp/sound_changed_event -o /dev/null
+done
