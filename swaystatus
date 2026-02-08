@@ -1,52 +1,25 @@
 #!/usr/bin/sh
- 
-CACHE_DIR="/tmp/swaystatus"
-DATA_FILE="$CACHE_DIR/swaystatus_airquality"
-mkdir -p "$CACHE_DIR"
+CACHE_DIR_DEFAULT="/tmp/swaystatus/"
+CACHE_FILE_DEFAULT="${CACHE_DIR_DEFAULT}swaystatus_airquality"
+CACHE_FILE="${SWAYSTATUS_DATA_FILE:-$CACHE_FILE_DEFAULT}"
+
+mkdir -p "$CACHE_DIR_DEFAULT"
 
 # Ensure file exists for inotifywait, but don't overwrite if it has content
-if [ ! -f "$DATA_FILE" ]; then
-    touch "$DATA_FILE"
+if [ ! -f "$CACHE_FILE" ]; then
+    touch "$CACHE_FILE"
+fi
+
+if ! pgrep -f "swaystatus_aqi.py" > /dev/null; then
+    $HOME/.local/bin/swaystatus_aqi.py &
 fi
 
 function get_formatted_air_quality() {
-	export DATA_FILE="$DATA_FILE"
-	python3 -c '
-import sys, json, os
-
-data_file = os.environ.get("DATA_FILE")
-
-# Defaults
-p, n, co = -1, -1, -1
-pc, nc, coc = "⚪", "⚪", "⚪"
-name = "Loading..."
-
-def get_color(v):
-    return "⚪" if v<=0 else "🔵" if v<=25 else "🟢" if v<=50 else "🟡" if v<=100 else "🟠" if v<=150 else "🔴" if v<=200 else "🟣" if v<=300 else "🟤"
-
-try:
-    if data_file and os.path.exists(data_file):
-        with open(data_file, "r") as f:
-            full_data = json.load(f)["data"]
-            d = full_data["iaqi"]
-            # Extract name from "city": {"name": "Beijing (北京)"}
-            # We split by "(" to get just "Beijing " and strip whitespace
-            full_name = full_data.get("city", {}).get("name", "Unknown")
-            point_name = full_name.split("(")[0].strip()
-        
-        pv = d.get("pm25",{}).get("v",0)
-        nv = d.get("no2",{}).get("v",0)
-        cv = d.get("co",{}).get("v",0)
-        
-        p, pc = pv, get_color(pv)
-        n, nc = nv, get_color(nv)
-        co, coc = cv, get_color(cv)
-        name = point_name
-except:
-    pass
-
-print(f"{name}: PM2.5 {pc}{p} NO2 {nc}{n} CO {coc}{co}")
-'
+    if [ -f "${CACHE_FILE}_formatted" ]; then
+        cat "${CACHE_FILE}_formatted"
+    else
+        echo "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273.15°C | 💧-1% | 🗜-1hPa | 💨36000m/s"
+    fi
 }
 
 function get_battery_info()
@@ -77,8 +50,6 @@ function get_battery_info()
 
 # Start the fetcher daemon
 # Kill existing instances to avoid duplicates
-pkill -f swaystatus_aqi.py 2>/dev/null
-$HOME/.local/bin/swaystatus_aqi.py &
 
 # Just to refresh the status bar at start
 $HOME/.local/bin/upvolstatus
