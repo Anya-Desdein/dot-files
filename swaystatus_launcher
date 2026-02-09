@@ -1,0 +1,9 @@
+#!/usr/bin/sh
+
+# Private environment variables for swaystatus
+export SWAYSTATUS_TOKEN="mytoken"
+export SWAYSTATUS_DATA_FILE="/tmp/swaystatus/swaystatus_airquality"
+export SWAYSTATUS_LOCATION="mylocation"
+
+# Run swaystatus with the environment variables set
+exec $HOME/.local/bin/swaystatus

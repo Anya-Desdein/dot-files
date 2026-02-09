@@ -47,9 +47,9 @@ def format_aqi(full_data):
         h, pres, t, w = hv, pres, tv, wv
         name = point_name
         
-        return f"{name}: PM2.5{pc}{pv} | NO2{nc}{nv} | CO{coc}{cv} | 🌡️{t}°C | 💧{h}% | 🗜{pres}hPa | 💨{w}m/s"
+        return f"{name}: PM2.5{pc}{pv} | NO2{nc}{nv} | CO{coc}{cv} | 🌡️{t}°C | 💧{h}% | 📥{pres}hPa | 💨{w}m/s"
     except Exception:
-        return "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273.15°C | 💧-1% | 🗜-1hPa | 💨36000m/s"
+        return "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273.15°C | 💧-1% |  📥-1hPa | 💨36000m/s"
 
 def fetch_and_save():
     try:
