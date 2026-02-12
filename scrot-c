@@ -1,0 +1,11 @@
+#!/bin/bash
+# Screenshot with area selection, copy to clipboard
+
+mkdir -p /tmp/scrot
+
+TMPFILE=$(mktemp /tmp/scrot/screenshot-XXXXXX.png)
+rm "$TMPFILE" 
+
+scrot -s "$TMPFILE" && \
+  xclip -selection clipboard -t image/png -i "$TMPFILE" && \
+  rm "$TMPFILE"
