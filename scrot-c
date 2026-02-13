@@ -1,6 +1,9 @@
 #!/bin/bash
 # Screenshot with area selection, copy to clipboard
 
+# Wait for dmenu to release X grab
+sleep 0.3
+
 mkdir -p /tmp/scrot
 
 TMPFILE=$(mktemp /tmp/scrot/screenshot-XXXXXX.png)
