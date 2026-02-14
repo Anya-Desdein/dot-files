@@ -1,0 +1,116 @@
+#!/usr/bin/bash
+
+TMP_NAME="${ENERGY_POLL:-energy_poll}"
+CACHE_DIR="/tmp/${TMP_NAME}"
+MEASUREMENTS_FILE="${CACHE_DIR}/power_measurements"
+MAX_MEASUREMENTS=20
+BATTERY_PATH="/sys/class/power_supply/BAT0"
+
+mkdir -p "$CACHE_DIR"
+
+if [ ! -f "$MEASUREMENTS_FILE" ]; then
+    touch "$MEASUREMENTS_FILE"
+fi
+
+# Check for inotifywait and notify if missing
+if ! command -v inotifywait >/dev/null 2>&1; then
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -u critical "Energy Poll Warning" \
+            "inotifywait not found!\nInstall inotify-tools package.\nFalling back to polling mode."
+    fi
+    echo "WARNING: inotifywait not found. Install inotify-tools package for efficient monitoring." >&2
+    echo "Falling back to polling mode..." >&2
+fi
+
+function get_average_from_previous() {
+    if [ ! -s "$MEASUREMENTS_FILE" ]; then
+        return 1
+    fi
+    
+    local sum=0
+    local count=0
+    
+    while read -r power; do
+        sum=$((sum + power))
+        count=$((count + 1))
+    done < "$MEASUREMENTS_FILE"
+    
+    if [ "$count" -eq 0 ]; then
+        return 0
+    fi
+    
+    local average=$((sum / count))
+    echo "$average"
+    return 0
+}
+
+function get_power_consumption() {
+    local power_now power_uw
+    
+    if [ -f "${BATTERY_PATH}/power_now" ]; then
+        power_now=$(cat "${BATTERY_PATH}/power_now")
+        if [ "$power_now" -ne 0 ] 2>/dev/null; then
+            echo "$power_now"
+            return 0
+        fi
+    fi
+    
+    # Fallback
+    if [ -f "${BATTERY_PATH}/current_now" ] && [ -f "${BATTERY_PATH}/voltage_now" ]; then
+        local current_now voltage_now
+
+        current_now=$(cat "${BATTERY_PATH}/current_now")
+        voltage_now=$(cat "${BATTERY_PATH}/voltage_now")
+
+        power_uw=$((current_now * voltage_now / 1000000))
+        if [ "$power_uw" -ne 0 ]; then
+            echo "$power_uw"
+            return 0
+        fi
+    fi
+    
+    get_average_from_previous
+}
+
+function add_measurement() {
+    local power_uw
+    power_uw=$(get_power_consumption)
+    
+    if [ "$power_uw" -eq 0 ] 2>/dev/null || [ -z "$power_uw" ]; then
+        return 1
+    fi
+    
+    echo "${power_uw}" >> "$MEASUREMENTS_FILE"
+    
+    local line_count
+    line_count=$(wc -l < "$MEASUREMENTS_FILE")
+    
+    if [ "$line_count" -gt "$MAX_MEASUREMENTS" ]; then
+        sed -i '1d' "$MEASUREMENTS_FILE"
+    fi
+}
+
+add_measurement
+
+if command -v inotifywait >/dev/null 2>&1; then
+
+    WATCH_FILES=()
+    [ -f "${BATTERY_PATH}/power_now" ] && WATCH_FILES+=("${BATTERY_PATH}/power_now")
+    [ -f "${BATTERY_PATH}/current_now" ] && WATCH_FILES+=("${BATTERY_PATH}/current_now")
+    
+    if [ ${#WATCH_FILES[@]} -gt 0 ]; then
+        inotifywait -m -e modify "${WATCH_FILES[@]}" 2>/dev/null | while read -r; do
+            add_measurement
+        done
+    else
+        echo "No battery files to monitor found" >&2
+        exit 1
+    fi
+else
+    # Fallback to polling if inotifywait is not available
+    echo "Warning: inotifywait not found, falling back to polling" >&2
+    while true; do
+        add_measurement
+        sleep 2
+    done
+fi
