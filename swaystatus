@@ -2,6 +2,7 @@
 CACHE_DIR_DEFAULT="/tmp/swaystatus/"
 CACHE_FILE_DEFAULT="${CACHE_DIR_DEFAULT}swaystatus_airquality"
 CACHE_FILE="${SWAYSTATUS_DATA_FILE:-$CACHE_FILE_DEFAULT}"
+LOW_BATTERY_STATE="${CACHE_DIR_DEFAULT}low_battery_notified"
 
 mkdir -p "$CACHE_DIR_DEFAULT"
 
@@ -22,13 +23,41 @@ function get_formatted_air_quality() {
     fi
 }
 
+function low_battery_notification() {
+	notify-send -u critical "Battery low: ${now}%!"
+}
+
 function get_battery_info()
 {
 	battery="/sys/class/power_supply/BAT0/"
 	[[ ! -d "$battery" ]] && echo -n "No battery?" && exit;
 
 	info=''
-	now=$(expr $(<"$battery/energy_now") \* 100 / $(<"$battery/energy_full_design"))
+	
+	now=$(expr $(<"$battery/energy_now") \* 100 / $(<"$battery/energy_full"))
+	degradation=$(expr 100 - $(<"$battery/energy_full") \* 100 / $(<"$battery/energy_full_design"))
+
+	if [ "$degradation" -le 10 ]; then
+		deg_icon="👶"
+	elif [ "$degradation" -le 20 ]; then
+		deg_icon="🧒"
+	elif [ "$degradation" -le 30 ]; then
+		deg_icon="🧑"
+	elif [ "$degradation" -le 40 ]; then
+		deg_icon="🧔"
+	elif [ "$degradation" -le 50 ]; then
+		deg_icon="🧓"
+	elif [ "$degradation" -le 60 ]; then
+		deg_icon="👴"
+	elif [ "$degradation" -le 70 ]; then
+		deg_icon="🧑"
+	elif [ "$degradation" -le 80 ]; then
+		deg_icon="💀"
+	elif [ "$degradation" -le 90 ]; then
+		deg_icon="🧟"
+	else
+		deg_icon="👻"
+	fi
 
 	state=$(cat "$battery/status")
 	case "$state" in
@@ -36,16 +65,70 @@ function get_battery_info()
 		state="🔋"
 		;;
 
-		Discharging)
+		Discharging|"Not charging")
 		state="♻️"
 		;;
 
-		Charging|Unknown)
+		Charging)
 		state="⚡"
+		;;
+
+		Unknown)
+		state="❓"
 		;;
 	esac
 
-	echo -n "$state$now%"
+	uptime=$(stat -c %Y "$LOW_BATTERY_STATE" 2>/dev/null)
+	uptime_now=$(date +%s)
+	uptime_diff=$((uptime_now - uptime))
+
+	if [ ! -f "$LOW_BATTERY_STATE" ]; then
+		touch "$LOW_BATTERY_STATE"
+		echo 0 > "$LOW_BATTERY_STATE" 2>/dev/null	
+	elif [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" = "1" ]; then
+		if [ -n "$uptime" ] && [ "$uptime_diff" -gt 120 ]; then
+			low_battery_notification
+			touch "$LOW_BATTERY_STATE"
+		fi
+	fi
+
+	time_left=""
+	if [ -f "/tmp/energy_poll/battery_left" ]; then
+		total_minutes=$(cat /tmp/energy_poll/battery_left)
+		total_minutes=${total_minutes%.*}
+		if [ -n "$total_minutes" ] && [ "$total_minutes" -gt 0 ] 2>/dev/null; then
+			hours=$((total_minutes / 60))
+			minutes=$((total_minutes % 60))
+			
+			if [ "$total_minutes" -lt 13 ]; then
+				indicator="❗️"
+			elif [ "$total_minutes" -lt 25 ]; then
+				indicator="🔴"
+			elif [ "$total_minutes" -gt 45 ]; then
+				indicator="🟡" 
+			else 
+				indicator="🟢"
+			fi
+			
+			if [ "$hours" -gt 0 ]; then
+				time_left=" ${indicator}${hours}h ${minutes}min"
+			else
+				time_left=" ${indicator}${minutes}min"
+			fi
+		fi
+	fi
+
+	if [ "$now" -lt 9 ] || [ "${total_minutes:-999}" -lt 13 ]; then
+		if [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" == "0" ]; then
+			echo 1 > "$LOW_BATTERY_STATE" 2>/dev/null
+		fi
+	else
+		if [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" == "1" ]; then
+			echo 0 > "$LOW_BATTERY_STATE" 2>/dev/null
+		fi
+	fi
+
+	echo -n "$state$now%$time_left 🪦$degradation%$deg_icon"
 }
 
 # Start the fetcher daemon
