@@ -72,6 +72,27 @@ function get_power_consumption() {
     get_average_from_previous
 }
 
+function calculate_battery_time_left() {
+    local energy_now avg_power
+
+    energy_now=$(cat "${BATTERY_PATH}/energy_now")    
+    avg_power=$(cat "${CACHE_DIR}/avg_power_consumption")
+    
+    if [ -z "$energy_now" ] || [ -z "$avg_power" ] || [ "$avg_power" -eq 0 ] 2>/dev/null; then
+        return 1
+    fi
+    
+    local hours_left
+    hours_left=$(echo "scale=3; $energy_now / $avg_power" | bc 2>/dev/null)
+    
+    if [ -n "$hours_left" ]; then
+        echo "$hours_left" > "${CACHE_DIR}/battery_left"
+        return 0
+    fi
+    
+    return 1
+}
+
 function add_measurement() {
     local power_uw
     power_uw=$(get_power_consumption)
@@ -87,6 +108,13 @@ function add_measurement() {
     
     if [ "$line_count" -gt "$MAX_MEASUREMENTS" ]; then
         sed -i '1d' "$MEASUREMENTS_FILE"
+    fi
+    
+    local avg
+    avg=$(get_average_from_previous)
+    if [ -n "$avg" ]; then
+        echo "$avg" > "${CACHE_DIR}/avg_power_consumption"
+        calculate_battery_time_left
     fi
 }
 
