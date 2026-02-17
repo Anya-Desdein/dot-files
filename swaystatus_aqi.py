@@ -53,7 +53,7 @@ def format_aqi(full_data):
         w_rounded = round(w)
         
         return f"{name}: PM2.5{pc}{pv} | NO2{nc}{nv} | CO{coc}{cv} | 🌡️{t_rounded}°C | 💧{h_rounded}% | 📥{pres_rounded}hPa | 💨{w_rounded}m/s"
-    except Exception:2
+    except Exception:
         return "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1% |  📥-1hPa | 💨36000m/s"
 
 def fetch_and_save():
