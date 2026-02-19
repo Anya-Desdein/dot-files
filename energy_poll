@@ -75,19 +75,26 @@ function get_power_consumption() {
 function calculate_battery_time_left() {
     local energy_now avg_power
 
-    energy_now=$(cat "${BATTERY_PATH}/energy_now")    
-    avg_power=$(cat "${CACHE_DIR}/avg_power_consumption")
-    
-    if [ -z "$energy_now" ] || [ -z "$avg_power" ] || [ "$avg_power" -eq 0 ] 2>/dev/null; then
+    if [ ! -f "${BATTERY_PATH}/energy_now" ]; then
         return 1
     fi
     
-    local hours_left
-    hours_left=$(echo "scale=3; $energy_now / $avg_power" | bc 2>/dev/null)
+    energy_now=$(cat "${BATTERY_PATH}/energy_now" 2>/dev/null)
     
-    if [ -n "$hours_left" ]; then
-        echo "$hours_left" > "${CACHE_DIR}/battery_left"
-        return 0
+    if [ ! -f "${CACHE_DIR}/avg_power_consumption" ]; then
+        touch "${CACHE_DIR}/avg_power_consumption"
+    fi
+    
+    avg_power=$(cat "${CACHE_DIR}/avg_power_consumption" 2>/dev/null)
+    
+    local minutes_left
+    if [ "$avg_power" -gt 0 ] 2>/dev/null && [ "$energy_now" -gt 0 ] 2>/dev/null; then
+        minutes_left=$((energy_now * 60 / avg_power))
+        
+        if [ -n "$minutes_left" ] && [ "$minutes_left" -ge 0 ] 2>/dev/null; then
+            echo "$minutes_left" > "${CACHE_DIR}/battery_left"
+            return 0
+        fi
     fi
     
     return 1
@@ -127,18 +134,21 @@ if command -v inotifywait >/dev/null 2>&1; then
     [ -f "${BATTERY_PATH}/current_now" ] && WATCH_FILES+=("${BATTERY_PATH}/current_now")
     
     if [ ${#WATCH_FILES[@]} -gt 0 ]; then
-        inotifywait -m -e modify "${WATCH_FILES[@]}" 2>/dev/null | while read -r; do
-            add_measurement
+        while true; do
+            if inotifywait -t 10 -e modify "${WATCH_FILES[@]}" >/dev/null 2>&1; then
+                add_measurement
+            else
+                add_measurement
+            fi
         done
     else
         echo "No battery files to monitor found" >&2
         exit 1
     fi
 else
-    # Fallback to polling if inotifywait is not available
     echo "Warning: inotifywait not found, falling back to polling" >&2
     while true; do
         add_measurement
-        sleep 2
+        sleep 10
     done
 fi
