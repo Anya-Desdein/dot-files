@@ -119,7 +119,7 @@ function get_battery_info()
 		fi
 	fi
 
-	if [ "$now" -lt 9 ] || [ "${total_minutes:-999}" -lt 13 ]; then
+	if [ "$now" -lt 11 ] || [ "${total_minutes:-999}" -lt 13 ]; then
 		if [ -z "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" ] || [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" == "0" ]; then
 			echo 1 > "$LOW_BATTERY_STATE" 2>/dev/null
 		fi
