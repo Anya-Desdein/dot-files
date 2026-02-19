@@ -12,15 +12,6 @@ if [ ! -f "$MEASUREMENTS_FILE" ]; then
     touch "$MEASUREMENTS_FILE"
 fi
 
-# Check for inotifywait and notify if missing
-if ! command -v inotifywait >/dev/null 2>&1; then
-    if command -v notify-send >/dev/null 2>&1; then
-        notify-send -u critical "Energy Poll Warning" \
-            "inotifywait not found!\nInstall inotify-tools package.\nFalling back to polling mode."
-    fi
-    echo "WARNING: inotifywait not found. Install inotify-tools package for efficient monitoring." >&2
-    echo "Falling back to polling mode..." >&2
-fi
 
 function get_average_from_previous() {
     if [ ! -s "$MEASUREMENTS_FILE" ]; then
@@ -127,28 +118,7 @@ function add_measurement() {
 
 add_measurement
 
-if command -v inotifywait >/dev/null 2>&1; then
-
-    WATCH_FILES=()
-    [ -f "${BATTERY_PATH}/power_now" ] && WATCH_FILES+=("${BATTERY_PATH}/power_now")
-    [ -f "${BATTERY_PATH}/current_now" ] && WATCH_FILES+=("${BATTERY_PATH}/current_now")
-    
-    if [ ${#WATCH_FILES[@]} -gt 0 ]; then
-        while true; do
-            if inotifywait -t 25 -e modify "${WATCH_FILES[@]}" >/dev/null 2>&1; then
-                add_measurement
-            else
-                add_measurement
-            fi
-        done
-    else
-        echo "No battery files to monitor found" >&2
-        exit 1
-    fi
-else
-    echo "Warning: inotifywait not found, falling back to polling" >&2
-    while true; do
-        add_measurement
-        sleep 25
-    done
-fi
+while true; do
+    add_measurement
+    sleep 25
+done
