@@ -5,6 +5,6 @@ export SWAYSTATUS_TOKEN="mytoken"
 export SWAYSTATUS_DATA_FILE="/tmp/swaystatus/swaystatus_airquality"
 export SWAYSTATUS_LOCATION="mylocation"
 export ENERGY_POLL="energy_poll"
+export SWAYSTATUS_ENABLE_SUSPEND_TO_RAM="TRUE"
 
-# Run swaystatus with the environment variables set
 exec $HOME/.local/bin/swaystatus

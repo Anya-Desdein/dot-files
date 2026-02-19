@@ -1,0 +1,35 @@
+#!/bin/bash
+# Script to suspend to RAM if SWAYSTATUS_ENABLE_SUSPEND_TO_RAM is TRUE
+
+if [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" != "TRUE" ]; then
+    echo "SWAYSTATUS_ENABLE_SUSPEND_TO_RAM feature NOT enabled. Exiting."
+    exit 0
+fi
+
+if ! command -v systemctl &> /dev/null; then
+    echo "Error: systemctl command not found. Cannot suspend."
+    exit 1
+fi
+
+if ! swapon --show | grep -q .; then
+    echo "Error: No swap partition found. Suspend may not work properly."
+    exit 1
+fi
+
+if [ "$EUID" -ne 0 ]; then
+    echo "Error: This script must be run with root."
+    exit 1
+fi
+
+if ! systemctl suspend --help &> /dev/null; then
+    echo "Error: systemctl suspend command not available."
+    exit 1
+fi
+
+if command -v notify-send &> /dev/null; then
+    notify-send -u critical "System will SUSPEND to RAM in 5 seconds..."
+else
+    echo "Warning: notify-send not found. System will SUSPEND to RAM in 5 seconds..."
+fi
+sleep 5
+systemctl suspend
