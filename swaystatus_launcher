@@ -2,7 +2,7 @@
 
 # Private environment variables for swaystatus
 export SWAYSTATUS_TOKEN="mytoken"
-export SWAYSTATUS_DATA_FILE="/tmp/swaystatus/swaystatus_airquality"
+export SWAYSTATUS_DIR="/tmp/swaystatus/"
 export SWAYSTATUS_LOCATION="mylocation"
 export ENERGY_POLL="energy_poll"
 export SWAYSTATUS_ENABLE_SUSPEND_TO_RAM="TRUE"
