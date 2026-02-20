@@ -3,6 +3,7 @@ CACHE_DIR_DEFAULT="/tmp/swaystatus/"
 CACHE_FILE_DEFAULT="${CACHE_DIR_DEFAULT}swaystatus_airquality"
 CACHE_FILE="${SWAYSTATUS_DATA_FILE:-$CACHE_FILE_DEFAULT}"
 LOW_BATTERY_STATE="${CACHE_DIR_DEFAULT}low_battery_notified"
+SUSPEND_SCRIPT="$HOME/.local/bin/suspend_to_ram"
 
 mkdir -p "$CACHE_DIR_DEFAULT"
 
@@ -122,6 +123,13 @@ function get_battery_info()
 	if [ "$now" -lt 11 ] || [ "${total_minutes:-999}" -lt 13 ]; then
 		if [ -z "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" ] || [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" == "0" ]; then
 			echo 1 > "$LOW_BATTERY_STATE" 2>/dev/null
+
+			if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
+				if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 8 ]; then
+					SWAYSTATUS_ENABLE_SUSPEND_TO_RAM=TRUE "$SUSPEND_SCRIPT" &
+				fi
+			fi
+
 		fi
 	else
 		if [ -z "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" ] || [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" == "1" ]; then

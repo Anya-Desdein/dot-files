@@ -16,13 +16,8 @@ if ! swapon --show | grep -q .; then
     exit 1
 fi
 
-if [ "$EUID" -ne 0 ]; then
-    echo "Error: This script must be run with root."
-    exit 1
-fi
-
-if ! systemctl suspend --help &> /dev/null; then
-    echo "Error: systemctl suspend command not available."
+if ! command -v loginctl &> /dev/null; then
+    echo "Error: loginctl not found. Cannot suspend."
     exit 1
 fi
 
@@ -32,4 +27,6 @@ else
     echo "Warning: notify-send not found. System will SUSPEND to RAM in 5 seconds..."
 fi
 sleep 5
-systemctl suspend
+
+dbus-send --system --print-reply --dest=org.freedesktop.login1 \
+    /org/freedesktop/login1 org.freedesktop.login1.Manager.Suspend boolean:false
