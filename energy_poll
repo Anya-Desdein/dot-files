@@ -4,53 +4,52 @@ TMP_NAME="${ENERGY_POLL:-energy_poll}"
 CACHE_DIR="/tmp/${TMP_NAME}"
 ENERGY_BEFORE_FILE="${CACHE_DIR}/energy_before"
 BATTERY_LEFT_FILE="${CACHE_DIR}/battery_left"
+
 BATTERY_PATH="/sys/class/power_supply/BAT0"
+ENERGY_NOW_FILE="${BATTERY_PATH}/energy_now"
+
 INTERVAL_SECONDS=120
 
 mkdir -p "$CACHE_DIR"
 
-if [ ! -f "${BATTERY_PATH}/energy_now" ]; then
-    echo "No energy_now at ${BATTERY_PATH}" >&2
-    exit 1
-fi
-
 while true; do
-    energy_now=$(cat "${BATTERY_PATH}/energy_now" 2>/dev/null)
+    mkdir -p "$CACHE_DIR"
 
-    if [ -z "$energy_now" ] || [ "$energy_now" -le 1 ] 2>/dev/null; then
+    if [ ! -f "$ENERGY_NOW_FILE" ]; then
+        echo "No energy_now at ${BATTERY_PATH}" >&2
+        sleep "$INTERVAL_SECONDS"
+        continue;
+    fi
+
+    energy_now=$(cat "$ENERGY_NOW_FILE" 2>/dev/null)
+    if [ -z "$energy_now" ] || [ "$energy_now" -le 0 ] 2>/dev/null; then
         sleep "$INTERVAL_SECONDS"
         continue
     fi
-
-    if [ ! -f "$ENERGY_BEFORE_FILE" ] || [ ! -s "$ENERGY_BEFORE_FILE" ]; then
+    
+    if [ ! -f "$ENERGY_BEFORE_FILE" ]; then
         echo "$energy_now" > "$ENERGY_BEFORE_FILE"
         sleep "$INTERVAL_SECONDS"
-        continue
+        continue;
     fi
 
     energy_before=$(cat "$ENERGY_BEFORE_FILE" 2>/dev/null)
     echo "$energy_now" > "$ENERGY_BEFORE_FILE"
 
     energy_used=$((energy_before - energy_now))
-
-    if [ -z "$energy_used" ]; then
-        echo "0" > "$BATTERY_LEFT_FILE"
-        sleep "$INTERVAL_SECONDS"
-        continue
-    fi
-
     if [ "$energy_used" -le 0 ] 2>/dev/null; then
-        echo "111111" > "$BATTERY_LEFT_FILE"
+        echo "♾️" > "$BATTERY_LEFT_FILE"
         sleep "$INTERVAL_SECONDS"
         continue
     fi
 
     minutes_left=$((energy_now * 2 / energy_used))
-    if [ "$minutes_left" -gt 111111 ] 2>/dev/null; then
-        minutes_left=111111
+    if [ "$minutes_left" -gt 12 * 60 ] 2>/dev/null; then
+        echo "♾️" > "$BATTERY_LEFT_FILE"
+        sleep "$INTERVAL_SECONDS"
+        continue
     fi
-    echo "$minutes_left" > "$BATTERY_LEFT_FILE"
 
-    echo "$energy_now" > "$ENERGY_BEFORE_FILE"
+    echo "$minutes_left" > "$BATTERY_LEFT_FILE"
     sleep "$INTERVAL_SECONDS"
 done
