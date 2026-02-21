@@ -10,6 +10,12 @@ ENERGY_NOW_FILE="${BATTERY_PATH}/energy_now"
 
 INTERVAL_SECONDS=120
 
+write_atomic() {
+    local file="$1" content="$2"
+    local tmp
+    tmp=$(mktemp -p "$CACHE_DIR") && echo "$content" > "$tmp" && mv -- "$tmp" "$file"
+}
+
 mkdir -p "$CACHE_DIR"
 
 while true; do
@@ -28,28 +34,28 @@ while true; do
     fi
     
     if [ ! -f "$ENERGY_BEFORE_FILE" ]; then
-        echo "$energy_now" > "$ENERGY_BEFORE_FILE"
+        write_atomic "$ENERGY_BEFORE_FILE" "$energy_now"
         sleep "$INTERVAL_SECONDS"
         continue;
     fi
 
     energy_before=$(cat "$ENERGY_BEFORE_FILE" 2>/dev/null)
-    echo "$energy_now" > "$ENERGY_BEFORE_FILE"
+    write_atomic "$ENERGY_BEFORE_FILE" "$energy_now"
 
     energy_used=$((energy_before - energy_now))
     if [ "$energy_used" -le 0 ] 2>/dev/null; then
-        echo "♾️" > "$BATTERY_LEFT_FILE"
+        write_atomic "$BATTERY_LEFT_FILE" "♾️"
         sleep "$INTERVAL_SECONDS"
         continue
     fi
 
     minutes_left=$((energy_now * 2 / energy_used))
     if [ "$minutes_left" -gt 12 * 60 ] 2>/dev/null; then
-        echo "♾️" > "$BATTERY_LEFT_FILE"
+        write_atomic "$BATTERY_LEFT_FILE" "♾️"
         sleep "$INTERVAL_SECONDS"
         continue
     fi
 
-    echo "$minutes_left" > "$BATTERY_LEFT_FILE"
+    write_atomic "$BATTERY_LEFT_FILE" "$minutes_left"
     sleep "$INTERVAL_SECONDS"
 done
