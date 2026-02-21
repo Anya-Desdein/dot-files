@@ -2,123 +2,55 @@
 
 TMP_NAME="${ENERGY_POLL:-energy_poll}"
 CACHE_DIR="/tmp/${TMP_NAME}"
-MEASUREMENTS_FILE="${CACHE_DIR}/power_measurements"
-MAX_MEASUREMENTS=20
+ENERGY_BEFORE_FILE="${CACHE_DIR}/energy_before"
+BATTERY_LEFT_FILE="${CACHE_DIR}/battery_left"
 BATTERY_PATH="/sys/class/power_supply/BAT0"
+INTERVAL_SECONDS=120
 
 mkdir -p "$CACHE_DIR"
 
-if [ ! -f "$MEASUREMENTS_FILE" ]; then
-    touch "$MEASUREMENTS_FILE"
+if [ ! -f "${BATTERY_PATH}/energy_now" ]; then
+    echo "No energy_now at ${BATTERY_PATH}" >&2
+    exit 1
 fi
 
-
-function get_average_from_previous() {
-    if [ ! -s "$MEASUREMENTS_FILE" ]; then
-        return 1
-    fi
-    
-    local sum=0
-    local count=0
-    
-    while read -r power; do
-        sum=$((sum + power))
-        count=$((count + 1))
-    done < "$MEASUREMENTS_FILE"
-    
-    if [ "$count" -eq 0 ]; then
-        return 0
-    fi
-    
-    local average=$((sum / count))
-    echo "$average"
-    return 0
-}
-
-function get_power_consumption() {
-    local power_now power_uw
-    
-    if [ -f "${BATTERY_PATH}/power_now" ]; then
-        power_now=$(cat "${BATTERY_PATH}/power_now")
-        if [ "$power_now" -ne 0 ] 2>/dev/null; then
-            echo "$power_now"
-            return 0
-        fi
-    fi
-    
-    # Fallback
-    if [ -f "${BATTERY_PATH}/current_now" ] && [ -f "${BATTERY_PATH}/voltage_now" ]; then
-        local current_now voltage_now
-
-        current_now=$(cat "${BATTERY_PATH}/current_now")
-        voltage_now=$(cat "${BATTERY_PATH}/voltage_now")
-
-        power_uw=$((current_now * voltage_now / 1000000))
-        if [ "$power_uw" -ne 0 ]; then
-            echo "$power_uw"
-            return 0
-        fi
-    fi
-    
-    get_average_from_previous
-}
-
-function calculate_battery_time_left() {
-    local energy_now avg_power
-
-    if [ ! -f "${BATTERY_PATH}/energy_now" ]; then
-        return 1
-    fi
-    
-    energy_now=$(cat "${BATTERY_PATH}/energy_now" 2>/dev/null)
-    
-    if [ ! -f "${CACHE_DIR}/avg_power_consumption" ]; then
-        touch "${CACHE_DIR}/avg_power_consumption"
-    fi
-    
-    avg_power=$(cat "${CACHE_DIR}/avg_power_consumption" 2>/dev/null)
-    
-    local minutes_left
-    if [ "$avg_power" -gt 0 ] 2>/dev/null && [ "$energy_now" -gt 0 ] 2>/dev/null; then
-        minutes_left=$((energy_now * 60 / avg_power))
-        
-        if [ -n "$minutes_left" ] && [ "$minutes_left" -ge 0 ] 2>/dev/null; then
-            echo "$minutes_left" > "${CACHE_DIR}/battery_left"
-            return 0
-        fi
-    fi
-    
-    return 1
-}
-
-function add_measurement() {
-    local power_uw
-    power_uw=$(get_power_consumption)
-    
-    if [ "$power_uw" -eq 0 ] 2>/dev/null || [ -z "$power_uw" ]; then
-        return 1
-    fi
-    
-    echo "${power_uw}" >> "$MEASUREMENTS_FILE"
-    
-    local line_count
-    line_count=$(wc -l < "$MEASUREMENTS_FILE")
-    
-    if [ "$line_count" -gt "$MAX_MEASUREMENTS" ]; then
-        sed -i '1d' "$MEASUREMENTS_FILE"
-    fi
-    
-    local avg
-    avg=$(get_average_from_previous)
-    if [ -n "$avg" ]; then
-        echo "$avg" > "${CACHE_DIR}/avg_power_consumption"
-        calculate_battery_time_left
-    fi
-}
-
-add_measurement
-
 while true; do
-    add_measurement
-    sleep 25
+    energy_now=$(cat "${BATTERY_PATH}/energy_now" 2>/dev/null)
+
+    if [ -z "$energy_now" ] || [ "$energy_now" -le 1 ] 2>/dev/null; then
+        sleep "$INTERVAL_SECONDS"
+        continue
+    fi
+
+    if [ ! -f "$ENERGY_BEFORE_FILE" ] || [ ! -s "$ENERGY_BEFORE_FILE" ]; then
+        echo "$energy_now" > "$ENERGY_BEFORE_FILE"
+        sleep "$INTERVAL_SECONDS"
+        continue
+    fi
+
+    energy_before=$(cat "$ENERGY_BEFORE_FILE" 2>/dev/null)
+    echo "$energy_now" > "$ENERGY_BEFORE_FILE"
+
+    energy_used=$((energy_before - energy_now))
+
+    if [ -z "$energy_used" ]; then
+        echo "0" > "$BATTERY_LEFT_FILE"
+        sleep "$INTERVAL_SECONDS"
+        continue
+    fi
+
+    if [ "$energy_used" -le 0 ] 2>/dev/null; then
+        echo "111111" > "$BATTERY_LEFT_FILE"
+        sleep "$INTERVAL_SECONDS"
+        continue
+    fi
+
+    minutes_left=$((energy_now * 2 / energy_used))
+    if [ "$minutes_left" -gt 111111 ] 2>/dev/null; then
+        minutes_left=111111
+    fi
+    echo "$minutes_left" > "$BATTERY_LEFT_FILE"
+
+    echo "$energy_now" > "$ENERGY_BEFORE_FILE"
+    sleep "$INTERVAL_SECONDS"
 done
