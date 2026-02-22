@@ -29,10 +29,15 @@ def format_aqi(full_data):
     try:
         d = full_data.get("data", {}).get("iaqi", {})
         
-        # Extract name
         full_name = full_data.get("data", {}).get("city", {}).get("name", "N/A")
         point_name = full_name.split("(")[0].strip()
-        
+
+        # Remove me if you want full name
+        if " - " in point_name:
+            point_name = point_name.split(" - ", 1)[0].strip()
+        elif "," in point_name:
+            point_name = point_name.split(",", 1)[0].strip()
+
         pv = d.get("pm25",{}).get("v",-1)
         nv = d.get("no2",{}).get("v",-1)
         cv = d.get("co",{}).get("v",-1)
