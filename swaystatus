@@ -33,7 +33,7 @@ function low_battery_notification() {
 	if [ "$battery_level" -lt 11 ] || [ "$time_left_minutes" -lt 13 ]; then
 		urgency="critical"
 
-	elif [ "$battery_level" -gt 20 ] && [ "$time_left_minutes" -gt 25 ]; then
+	elif [ "$battery_level" -gt 15 ] && [ "$time_left_minutes" -gt 20 ]; then
 		urgency="low"
 
 	else
@@ -109,6 +109,13 @@ function get_battery_info()
 	total_minutes=""
 	if [ -f "/tmp/energy_poll/battery_left" ]; then
 		total_minutes=$(cat /tmp/energy_poll/battery_left)
+
+		case "$total_minutes" in
+			*♾️*)
+				time_left=" 🟢♾️"
+				;;
+			*)
+
 		total_minutes=${total_minutes%.*}
 		if [ -n "$total_minutes" ] && [ "$total_minutes" -gt 0 ] 2>/dev/null; then
 			hours=$((total_minutes / 60))
@@ -130,6 +137,8 @@ function get_battery_info()
 				time_left=" ${indicator}${minutes}m"
 			fi
 		fi
+		;;
+	esac
 	fi
 
 	if [ "$state" != "⚡" ] &&  [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" = "1" ]; then
@@ -179,14 +188,17 @@ function update_status() {
 	echo "$aqi_line | $battery_level | $volume_line | $date"
 }
 
-# Call immediately - output will be flushed automatically
-update_status
 
 $HOME/.local/bin/upvolstatus
+
 touch /tmp/power_changed_event
+
+update_status
+touch /tmp/sound_changed_event
+
 
 while :
 do
-	sleep 30
+	inotifywait -q -e modify,close_write -t 30 /tmp/power_changed_event /tmp/sound_changed_event -o /dev/null 2>/dev/null
 	update_status
 done
