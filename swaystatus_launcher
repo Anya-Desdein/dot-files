@@ -7,4 +7,6 @@ export SWAYSTATUS_LOCATION="mylocation"
 export ENERGY_POLL="energy_poll"
 export SWAYSTATUS_ENABLE_SUSPEND_TO_RAM="TRUE"
 
-exec $HOME/.local/bin/swaystatus
+# Line-buffered stdout so each status line is flushed immediately; no PTY (script)
+# so swaybar always receives complete lines and doesn't ellipsize
+exec stdbuf -oL -eL "$HOME/.local/bin/swaystatus"
