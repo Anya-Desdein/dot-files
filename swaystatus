@@ -1,11 +1,16 @@
 #!/usr/bin/sh
 
+# set -x
+
 CACHE_DIR="${SWAYSTATUS_DIR:-/tmp/swaystatus/}"
 CACHE_FILE="${CACHE_DIR}swaystatus_airquality"
+
+BATTERY_FILE="/tmp/energy_poll/battery_left"
 LOW_BATTERY_STATE="${CACHE_DIR}low_battery_notified"
 NOTIFICATION_SENT_FILE="${CACHE_DIR}notification_sent"
 
 SUSPEND_SCRIPT="$HOME/.local/bin/suspend_to_ram"
+BATTERY="/sys/class/power_supply/BAT0/"
 
 mkdir -p "$CACHE_DIR"
 [ ! -f "$CACHE_FILE" ] && touch "$CACHE_FILE"
@@ -30,27 +35,21 @@ function low_battery_notification() {
 	
 	time_left_minutes=${time_left_minutes:-999}
 	
-	if [ "$battery_level" -lt 11 ] || [ "$time_left_minutes" -lt 13 ]; then
+	if [ "$battery_level" -le 8 ] || [ "$time_left_minutes" -le 12 ]; then
 		urgency="critical"
-
-	elif [ "$battery_level" -gt 15 ] && [ "$time_left_minutes" -gt 20 ]; then
-		urgency="low"
-
 	else
-		urgency="normal"
+		urgency="low"
 	fi
 	notify-send -u "$urgency" "Battery low: ${battery_level}%!"
 }
 
-function get_battery_info()
-{
-	battery="/sys/class/power_supply/BAT0/"
-	[[ ! -d "$battery" ]] && echo -n "?" && return 1;
-
+function get_battery_info() {
 	info=''
+	[[ ! -d "$BATTERY" ]] && echo -n "$info" && return 1;
+
 	
-	now=$(($(<"$battery/energy_now") * 100 / $(<"$battery/energy_full")))
-	degradation=$((100 - $(<"$battery/energy_full") * 100 / $(<"$battery/energy_full_design")))
+	now=$(($(<"$BATTERY/energy_now") * 100 / $(<"$BATTERY/energy_full")))
+	degradation=$((100 - $(<"$BATTERY/energy_full") * 100 / $(<"$BATTERY/energy_full_design")))
 
 	if [ "$degradation" -le 10 ]; then
 		deg_icon="👶"
@@ -74,10 +73,10 @@ function get_battery_info()
 		deg_icon="🫥"
 	fi
 
-	if [ ! -f "$battery/status" ]; then
-		state="❓"
+	if [ ! -f "$BATTERY/status" ]; then
+		state="?"
 	else
-		state=$(cat "$battery/status")
+		state=$(cat "$BATTERY/status")
 	fi
 	case "$state" in
 		Full)
@@ -93,7 +92,7 @@ function get_battery_info()
 		;;
 
 		Unknown)
-		state="❓"
+		state="?"
 		;;
 	esac
 
@@ -107,8 +106,8 @@ function get_battery_info()
 
 	time_left=""
 	total_minutes=""
-	if [ -f "/tmp/energy_poll/battery_left" ]; then
-		total_minutes=$(cat /tmp/energy_poll/battery_left)
+	if [ -f "$BATTERY_FILE" ]; then
+		total_minutes=$(cat "$BATTERY_FILE")
 
 		case "$total_minutes" in
 			*♾️*)
@@ -150,14 +149,16 @@ function get_battery_info()
 		fi
 	fi
 
-	if [ "$now" -lt 15 ] || [ "${total_minutes:-999}" -lt 22 ]; then
+	if [! "${total_minutes:-999}" = *♾️*] || [ "$now" -lt 15 ] || [ "${total_minutes:-999}" -lt 22 ]; then
 		if [ -z "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" ] || [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" = "0" ]; then
 			echo 1 > "$LOW_BATTERY_STATE" 2>/dev/null
 
 			if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
-				if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 8 ]; then
+				if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 10 ]; then
 					SWAYSTATUS_ENABLE_SUSPEND_TO_RAM=TRUE "$SUSPEND_SCRIPT" &
 				fi
+			else
+				notify-send -u "critical" "File not found or lacks permissions"
 			fi
 
 		fi
@@ -185,7 +186,7 @@ function update_status() {
 	
 	battery_level=$(get_battery_info)
 	date=$(date "+%d %b %Y %H:%M")
-	echo "$aqi_line | $battery_level | $volume_line | $date"
+	echo "$aqi_line | $battery_level | $volume_line | $date"	
 }
 
 
