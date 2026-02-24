@@ -1,0 +1,13 @@
+#!/usr/bin/sh
+
+audioinfo=$(amixer sget Master)
+[[ "$audioinfo" =~ \[([0-9]+%)\].*\[(on|off)\] ]]
+volume=${BASH_REMATCH[1]}
+volume_status=`case "${BASH_REMATCH[2]}" in
+	off) echo "🔇";;
+	on)  echo "🔉";;
+	*)   echo "🔉?";;
+esac`
+
+echo -n "${volume_status} ${volume}" > /tmp/sound_changed_event
+
