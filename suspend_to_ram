@@ -11,16 +11,6 @@ if ! command -v systemctl &> /dev/null; then
     exit 1
 fi
 
-if ! swapon --show | grep -q .; then
-    echo "Error: No swap partition found. Suspend may not work properly."
-    exit 1
-fi
-
-if ! command -v loginctl &> /dev/null; then
-    echo "Error: loginctl not found. Cannot suspend."
-    exit 1
-fi
-
 if command -v notify-send &> /dev/null; then
     notify-send -u critical "System will SUSPEND to RAM in 5 seconds..."
 else
