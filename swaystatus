@@ -106,14 +106,12 @@ function get_battery_info() {
 
 	time_left=""
 	total_minutes=""
-
-	is_infinite=0
 	
 	if [ -f "$BATTERY_FILE" ]; then
 		total_minutes=$(cat "$BATTERY_FILE")
 
 		case "${total_minutes:-999}" in
-			*♾️*) is_infinite=1; time_left=" 🟢♾️" ;;
+			*♾️*) time_left=" 🟢♾️"; total_minutes=999 ;;
 			*)
 				total_minutes=${total_minutes%.*}
 				if [ -n "$total_minutes" ] && [ "$total_minutes" -gt 0 ] 2>/dev/null; then
@@ -138,32 +136,32 @@ function get_battery_info() {
 		esac
 	fi
 
-	if [ "$state" != "⚡" ] && [ "$is_infinite" = 0 ] && [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" = "1" ]; then
+	if [ "$state" != "⚡" ] && ( [ "$now" -le 15 ] || [ "${total_minutes:-999}" -le 22 ] ); then
+		echo 1 > "$LOW_BATTERY_STATE" 2>/dev/null
+		if [ ! -f "$NOTIFICATION_SENT_FILE" ]; then
+			echo 0 > "$NOTIFICATION_SENT_FILE" 2>/dev/null
+		fi
+	else 
+		echo 0 > "$LOW_BATTERY_STATE" 2>/dev/null
+		echo 0 > "$NOTIFICATION_SENT_FILE" 2>/dev/null
+	fi 
+	is_low_battery=$(cat "$LOW_BATTERY_STATE" 2>/dev/null || echo "0")
+  
+	if  [ "$is_low_battery" = 1 ]; then
 		notification_sent=$(cat "$NOTIFICATION_SENT_FILE" 2>/dev/null || echo "0")
-		if ( [ -n "$uptime" ] && [ "$uptime_diff" -gt 120 ] ) || [ "$notification_sent" -eq 0 ]; then
+
+		if ( [ -n "$uptime" ] && [ "$uptime_diff" -ge 120 ] ) || [ "$notification_sent" -eq 0 ]; then
 			low_battery_notification "$now" "${total_minutes:-999}"
 			echo "1" > "$NOTIFICATION_SENT_FILE"
 			touch "$LOW_BATTERY_STATE"
 		fi
-	fi
 
-	if [ "$is_infinite" = 0 ] && ( [ "$now" -lt 15 ] || [ "${total_minutes:-999}" -lt 22 ] ); then
-		if [ -z "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" ] || [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" = "0" ]; then
-			echo 1 > "$LOW_BATTERY_STATE" 2>/dev/null
-
-			if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
-				if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 10 ]; then
-					"$SUSPEND_SCRIPT" &
-				fi
-			else
-				notify-send -u "low" "Suspend script not found or lacks permissions"
+		if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
+			if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 10 ]; then
+				"$SUSPEND_SCRIPT" &
 			fi
-
 		fi
-	else
-		if [ -z "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" ] || [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" = "1" ]; then
-			echo 0 > "$LOW_BATTERY_STATE" 2>/dev/null
-		fi
+		
 	fi
 
 	echo -n "$state$now%$time_left 🪦$degradation%$deg_icon"
