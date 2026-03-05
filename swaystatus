@@ -153,7 +153,7 @@ function get_battery_info() {
 
 			if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
 				if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 10 ]; then
-					SWAYSTATUS_ENABLE_SUSPEND_TO_RAM=TRUE "$SUSPEND_SCRIPT" &
+					"$SUSPEND_SCRIPT" &
 				fi
 			else
 				notify-send -u "low" "Suspend script not found or lacks permissions"
