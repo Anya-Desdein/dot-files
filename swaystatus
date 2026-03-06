@@ -45,11 +45,14 @@ function low_battery_notification() {
 
 function get_battery_info() {
 	info=''
-	[[ ! -d "$BATTERY" ]] && echo -n "$info" && return 1;
+	[[ ! -d "$BATTERY" ]] && echo -n "?% 🪦?%" && return 0
 
-	
-	now=$(($(<"$BATTERY/energy_now") * 100 / $(<"$BATTERY/energy_full")))
-	degradation=$((100 - $(<"$BATTERY/energy_full") * 100 / $(<"$BATTERY/energy_full_design")))
+	# Read and trim sysfs (can be empty or odd after resume)
+	energy_now=$(tr -d '[:space:]' < "$BATTERY/energy_now" 2>/dev/null)
+	energy_full=$(tr -d '[:space:]' < "$BATTERY/energy_full" 2>/dev/null)
+	energy_full_design=$(tr -d '[:space:]' < "$BATTERY/energy_full_design" 2>/dev/null)
+	[[ -z "$energy_full" || ! "$energy_full" =~ ^[0-9]+$ || "$energy_full" -eq 0 ]] && now=0 || now=$(( (${energy_now:-0}) * 100 / energy_full ))
+	[[ -z "$energy_full_design" || ! "$energy_full_design" =~ ^[0-9]+$ || "$energy_full_design" -eq 0 ]] && degradation=0 || degradation=$(( 100 - energy_full * 100 / energy_full_design ))
 
 	if [ "$degradation" -le 10 ]; then
 		deg_icon="👶"
@@ -76,24 +79,14 @@ function get_battery_info() {
 	if [ ! -f "$BATTERY/status" ]; then
 		state="?"
 	else
-		state=$(cat "$BATTERY/status")
+		state=$(tr -d '[:space:]' < "$BATTERY/status" 2>/dev/null)
 	fi
 	case "$state" in
-		Full)
-		state="🔋"
-		;;
-
-		Discharging|"Not charging")
-		state="♻️"
-		;;
-
-		Charging)
-		state="⚡"
-		;;
-
-		Unknown)
-		state="?"
-		;;
+		Full)       state="🔋" ;;
+		Discharging|Notcharging) state="♻️" ;;
+		Charging)   state="⚡" ;;
+		Unknown)    state="?" ;;
+		*)          state="?" ;;
 	esac
 
 	uptime=$(stat -c %Y "$LOW_BATTERY_STATE" 2>/dev/null)
@@ -157,7 +150,7 @@ function get_battery_info() {
 		fi
 
 		if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
-			if [ "$now" -lt 8 ] || [ "${total_minutes:-999}" -lt 10 ]; then
+			if [ "$now" -le 8 ] || [ "${total_minutes:-999}" -lt 10 ]; then
 				"$SUSPEND_SCRIPT" &
 			fi
 		fi

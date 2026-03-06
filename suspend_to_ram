@@ -1,6 +1,9 @@
 #!/bin/bash
 # Script to suspend to RAM if SWAYSTATUS_ENABLE_SUSPEND_TO_RAM is TRUE
 
+# Cancel: create /tmp/suspend_to_ram/cancel (e.g. Mod+Control+0 in i3)
+CANCEL_FILE="/tmp/suspend_to_ram/cancel"
+
 if [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" != "TRUE" ]; then
     echo "SWAYSTATUS_ENABLE_SUSPEND_TO_RAM feature NOT enabled. Exiting."
     exit 0
@@ -11,16 +14,23 @@ if ! command -v systemctl &> /dev/null; then
     exit 1
 fi
 
+rm -f "$CANCEL_FILE"
+
 if command -v notify-send &> /dev/null; then
     notify_id=$(notify-send --print-id -u critical "System will SUSPEND to RAM in 30 seconds...")
-    for sec in $(seq 29 -1 1); do
-        sleep 1
+    for sec in $(seq 30 -1 1); do
         notify_id=$(notify-send --print-id --replace-id="$notify_id" -u critical "System will SUSPEND to RAM in ${sec} seconds...")
+        [ -f "$CANCEL_FILE" ] && rm -f "$CANCEL_FILE" && notify-send -u normal "Suspend cancelled" && exit 0
+        sleep 1
     done
 else
     echo "Warning: notify-send not found. System will SUSPEND to RAM in 30 seconds..."
-    sleep 30
+    for sec in $(seq 30 -1 1); do
+        [ -f "$CANCEL_FILE" ] && rm -f "$CANCEL_FILE" && exit 0
+        sleep 1
+    done
 fi
 
+rm -f "$CANCEL_FILE"
 dbus-send --system --print-reply --dest=org.freedesktop.login1 \
     /org/freedesktop/login1 org.freedesktop.login1.Manager.Suspend boolean:false
