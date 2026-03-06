@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script to suspend to RAM if SWAYSTATUS_ENABLE_SUSPEND_TO_RAM is TRUE
 
-# Cancel: create /tmp/suspend_to_ram/cancel (e.g. Mod+Control+0 in i3)
+# Cancel: create /tmp/suspend_to_ram/cancel (e.g. Mod+Control+c in i3)
 CANCEL_FILE="/tmp/suspend_to_ram/cancel"
 
 if [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" != "TRUE" ]; then

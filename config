@@ -146,7 +146,7 @@ bindsym $mod+Shift+9 move container to workspace $ws9
 bindsym $mod+Shift+0 move container to workspace $ws10
 
 # Cancel suspend countdown (creates /tmp/suspend_to_ram/cancel)
-bindsym $mod+Control+0 exec --no-startup-id bash -c 'mkdir -p /tmp/suspend_to_ram && touch /tmp/suspend_to_ram/cancel'
+bindsym $mod+Control+c exec --no-startup-id bash -c 'mkdir -p /tmp/suspend_to_ram && touch /tmp/suspend_to_ram/cancel'
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
