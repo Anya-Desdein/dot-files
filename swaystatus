@@ -157,7 +157,7 @@ function get_battery_info() {
 		fi
 
 		if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
-			if [ "$now" -lt 6 ] || [ "${total_minutes:-999}" -lt 10 ]; then
+			if [ "$now" -lt 8 ] || [ "${total_minutes:-999}" -lt 10 ]; then
 				"$SUSPEND_SCRIPT" &
 			fi
 		fi

@@ -12,11 +12,15 @@ if ! command -v systemctl &> /dev/null; then
 fi
 
 if command -v notify-send &> /dev/null; then
-    notify-send -u critical "System will SUSPEND to RAM in 5 seconds..."
+    notify_id=$(notify-send --print-id -u critical "System will SUSPEND to RAM in 30 seconds...")
+    for sec in $(seq 29 -1 1); do
+        sleep 1
+        notify_id=$(notify-send --print-id --replace-id="$notify_id" -u critical "System will SUSPEND to RAM in ${sec} seconds...")
+    done
 else
-    echo "Warning: notify-send not found. System will SUSPEND to RAM in 5 seconds..."
+    echo "Warning: notify-send not found. System will SUSPEND to RAM in 30 seconds..."
+    sleep 30
 fi
-sleep 5
 
 dbus-send --system --print-reply --dest=org.freedesktop.login1 \
     /org/freedesktop/login1 org.freedesktop.login1.Manager.Suspend boolean:false
