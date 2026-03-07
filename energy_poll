@@ -17,6 +17,7 @@ write_atomic() {
 }
 
 mkdir -p "$CACHE_DIR"
+exec 2>>/dev/null;
 
 while true; do
     mkdir -p "$CACHE_DIR"

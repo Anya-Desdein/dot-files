@@ -40,7 +40,9 @@ function low_battery_notification() {
 	else
 		urgency="low"
 	fi
-	notify-send -u "$urgency" "Battery low: ${battery_level}%!"
+	# Redirect stdout too: we're inside get_battery_info which is captured by the bar;
+	# D-Bus can print "method return..." to stdout and that would appear after deg_icon.
+	notify-send -u "$urgency" "Battery low: ${battery_level}%!" >/dev/null 2>&1
 }
 
 function get_battery_info() {
