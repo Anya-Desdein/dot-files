@@ -3,12 +3,13 @@
 # set -x
 
 CACHE_DIR="${SWAYSTATUS_DIR:-/tmp/swaystatus/}"
-CACHE_FILE="${CACHE_DIR}swaystatus_airquality"
 
-BATTERY_FILE="/tmp/energy_poll/battery_left"
+CACHE_FILE="${CACHE_DIR}swaystatus_airquality"
+IS_SUSPENDING_FILE="${CACHE_DIR}swaystatus_is_suspending"
 LOW_BATTERY_STATE="${CACHE_DIR}low_battery_notified"
 NOTIFICATION_SENT_FILE="${CACHE_DIR}notification_sent"
 
+BATTERY_FILE="/tmp/energy_poll/battery_left"
 SUSPEND_SCRIPT="$HOME/.local/bin/suspend_to_ram"
 BATTERY="/sys/class/power_supply/BAT0/"
 
@@ -46,6 +47,8 @@ function low_battery_notification() {
 	( notify-send -u "$urgency" "Battery low: ${battery_level}%!" >/dev/null 2>&1 ) &
 }
 
+
+CHARGING_ICON="⚡"
 function get_battery_info() {
 	info=''
 	[[ ! -d "$BATTERY" ]] && echo -n "?% 🪦?%" && return 0
@@ -85,9 +88,9 @@ function get_battery_info() {
 		state=$(tr -d '[:space:]' < "$BATTERY/status" 2>/dev/null)
 	fi
 	case "$state" in
-		Full)       state="🔋" ;;
+		Full)       state="🔋" ; rm -f "${CACHE_DIR}swaystatus_is_suspending" 2>/dev/null ;;
 		Discharging|Notcharging) state="♻️" ;;
-		Charging)   state="⚡" ;;
+		Charging)   state="$CHARGING_ICON" ; rm -f "${CACHE_DIR}swaystatus_is_suspending" 2>/dev/null ;;
 		Unknown)    state="?" ;;
 		*)          state="?" ;;
 	esac
@@ -104,7 +107,7 @@ function get_battery_info() {
 	total_minutes=""
 	
 	if [ -f "$BATTERY_FILE" ]; then
-		total_minutes=$(cat "$BATTERY_FILE")
+		total_minutes=$(cat "$BATTERY_FILE" 2>/dev/null)
 
 		case "${total_minutes:-999}" in
 			*♾️*) time_left=" 🟢♾️"; total_minutes=999 ;;
@@ -137,9 +140,10 @@ function get_battery_info() {
 		if [ ! -f "$NOTIFICATION_SENT_FILE" ]; then
 			echo 0 > "$NOTIFICATION_SENT_FILE" 2>/dev/null
 		fi
-	else 
+	else
 		echo 0 > "$LOW_BATTERY_STATE" 2>/dev/null
 		echo 0 > "$NOTIFICATION_SENT_FILE" 2>/dev/null
+		rm -f "${CACHE_DIR}swaystatus_is_suspending" 2>/dev/null
 	fi 
 	is_low_battery=$(cat "$LOW_BATTERY_STATE" 2>/dev/null || echo "0")
   
@@ -154,7 +158,10 @@ function get_battery_info() {
 
 		if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
 			if [ "$now" -le 8 ] || [ "${total_minutes:-999}" -lt 10 ]; then
-				"$SUSPEND_SCRIPT" &
+				if [ ! -f "$IS_SUSPENDING_FILE" ]; then
+					"$SUSPEND_SCRIPT" >/dev/null 2>&1 &
+					touch "$IS_SUSPENDING_FILE"
+				fi
 			fi
 		fi
 		
