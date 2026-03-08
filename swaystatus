@@ -26,7 +26,7 @@ function get_formatted_air_quality() {
     if [ -f "${CACHE_FILE}_formatted" ]; then
         cat "${CACHE_FILE}_formatted"
     else
-        echo "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1% | 📥-1hPa | 💨36000m/s"
+        echo "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1%"
     fi
 }
 

@@ -110,25 +110,21 @@ def format_aqi(full_data, uv_str=None):
         nv = d.get("no2",{}).get("v",-1)
         cv = d.get("co",{}).get("v",-1)
         hv = d.get("h",{}).get("v",-1)
-        pres = d.get("p",{}).get("v",-1)
         tv = d.get("t",{}).get("v",-273.15) # Absolute zero
-        wv = d.get("w",{}).get("v",36000) # Speed of sound
 
         pc  = get_color("pm25", pv)
         nc  = get_color("no2", nv)
         coc = get_color("co", cv)
-        h, pres, t, w = hv, pres, tv, wv
+        h, t = hv, tv
         name = point_name
         
         t_rounded = round(t)
         h_rounded = round(h)
-        pres_rounded = round(pres)
-        w_rounded = round(w)
         
         after_co = f" | {uv_str}" if uv_str else ""
-        return f"{name}: PM2.5{pc}{pv} | NO2{nc}{nv} | CO{coc}{cv}{after_co} | 🌡️{t_rounded}°C | 💧{h_rounded}% | 📥{pres_rounded}hPa | 💨{w_rounded}m/s"
+        return f"{name}: PM2.5{pc}{pv} | NO2{nc}{nv} | CO{coc}{cv}{after_co} | 🌡️{t_rounded}°C | 💧{h_rounded}%"
     except Exception:
-        return "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1% |  📥-1hPa | 💨36000m/s"
+        return "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1%"
 
 def _read_uv_str():
     try:
