@@ -110,7 +110,7 @@ function get_battery_info() {
 		total_minutes=$(cat "$BATTERY_FILE" 2>/dev/null)
 
 		case "${total_minutes:-999}" in
-			*♾️*) time_left=" 🟢♾️"; total_minutes=999 ;;
+			*∞*) time_left=" 🟢∞"; total_minutes=999 ;;
 			*)
 				total_minutes=${total_minutes%.*}
 				if [ -n "$total_minutes" ] && [ "$total_minutes" -gt 0 ] 2>/dev/null; then

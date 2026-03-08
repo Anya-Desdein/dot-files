@@ -1,12 +1,22 @@
 #!/usr/bin/sh
 
 # Private environment variables for swaystatus
-export SWAYSTATUS_TOKEN="mytoken"
+
 export SWAYSTATUS_DIR="/tmp/swaystatus/"
-export SWAYSTATUS_LOCATION="mylocation"
+
 export ENERGY_POLL="energy_poll"
 export SWAYSTATUS_ENABLE_SUSPEND_TO_RAM="TRUE"
 
-# Line-buffered stdout so each status line is flushed immediately; no PTY (script)
-# so swaybar always receives complete lines and doesn't ellipsize
-exec stdbuf -oL -eL "$HOME/.local/bin/swaystatus"
+export WAQI_TOKEN="mytoken"
+export WAQI_LOCATION="mylocation"
+
+export OPENUV_TOKEN="mytoken"
+export OPENUV_LAT="mylat"
+export OPENUV_LNG="mylng"
+export OPENUV_ALT="myalt"
+export OPENUV_SKIN_TYPE="skin_type"
+
+. "$HOME/.local/bin/swaystatus_config"
+export WAQI_TOKEN WAQI_LOCATION ENERGY_POLL SWAYSTATUS_ENABLE_SUSPEND_TO_RAM
+
+exec $HOME/.local/bin/swaystatus
