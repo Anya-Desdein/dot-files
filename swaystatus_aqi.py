@@ -32,14 +32,10 @@ SKIN_TYPE_MULT = {1: 2.5, 2: 3, 3: 4, 4: 5, 5: 8, 6: 15}
 
 def _parse_skin_type():
     try:
-        n = int(os.environ.get("OPENUV_SKIN_TYPE", "1").strip())
+        n = int(os.environ.get("OPENUV_SKIN_TYPE", "3").strip())
         return n if 1 <= n <= 6 else 1
     except (ValueError, TypeError):
         return 1
-
-
-OPENUV_SKIN_TYPE = _parse_skin_type()
-
 
 def get_color(t, v):
     # Pollutants (AQI scale)
@@ -47,7 +43,6 @@ def get_color(t, v):
         return "⚪" if v<=0 else "🔵" if v<=25 else "🟢" if v<=50 else "🟡" if v<=100 else "🟠" if v<=150 else "🔴" if v<=200 else "🟣" if v<=300 else "🟤"
     
     return "⚪"
-
 
 def get_uv_color(uv):
     # WHO UV index scale: 0-2 low, 3-5 moderate, 6-7 high, 8-10 very high, 11+ extreme
@@ -74,24 +69,41 @@ def time_to_burn_min(uv, skin_type):
     return (200 * mult) / (3 * uv)
 
 
+def _num_opt(val):
+    """Return float(val) or None if missing/invalid."""
+    try:
+        return float(val) if val is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def format_uv(full_data):
     try:
         res = full_data.get("result", {}) if full_data else {}
-        uv = res.get("uv")
-        uv_max = res.get("uv_max")
-        uv_c = get_uv_color(uv)
-        uv_max_c = get_uv_color(uv_max)
-        uv_val = round(uv, 1) if uv is not None else "?"
-        uv_max_val = round(uv_max, 1) if uv_max is not None else "?"
+        
+        uv = _num_opt(res.get("uv"))
+        uv_max = _num_opt(res.get("uv_max"))
+        OPENUV_SKIN_TYPE = _parse_skin_type()
+        
+        parts = []
+        if uv is not None:
+            parts.append(f"UV{get_uv_color(uv)}{round(uv, 1)}")
+        else:
+            parts.append("UV666")
+        if uv_max is not None:
+            parts.append(f"UVmax{get_uv_color(uv_max)}{round(uv_max, 1)}")
+        else:
+            parts.append("UVmax666")
+
         burn_min = time_to_burn_min(uv_max, OPENUV_SKIN_TYPE)
         if burn_min is not None:
-            burn_str = f"🔥{int(round(burn_min))}m"
+            parts.append(f"🔥{int(round(burn_min))}m")
         else:
-            burn_str = "🔥∞"
-        return f"UV{uv_c}{uv_val} | UVmax{uv_max_c}{uv_max_val} | {burn_str}"
-    except Exception:
-        return "UV⚪? | UVmax⚪? | 🔥?"
+            parts.append("🔥-∞m")
 
+        return " | ".join(parts) if parts else "UV666 | UVmax666 | 🔥-∞m"
+    except Exception:
+        return "UV666 | UVmax666 | 🔥-∞m"
 
 def format_aqi(full_data, uv_str=None):
     try:
@@ -106,25 +118,38 @@ def format_aqi(full_data, uv_str=None):
         elif "," in point_name:
             point_name = point_name.split(",", 1)[0].strip()
 
-        pv = d.get("pm25",{}).get("v",-1)
-        nv = d.get("no2",{}).get("v",-1)
-        cv = d.get("co",{}).get("v",-1)
-        hv = d.get("h",{}).get("v",-1)
-        tv = d.get("t",{}).get("v",-273.15) # Absolute zero
+        def _num(val, default):
+            try:
+                return float(val) if val is not None else default
+            except (TypeError, ValueError):
+                return default
+
+        pv = _num(d.get("pm25", {}).get("v"), -1)
+        nv = _num(d.get("no2", {}).get("v"), -1)
+        cv = _num(d.get("co", {}).get("v"), -1)
+        hv = _num(d.get("h", {}).get("v"), -1)
+        tv = _num(d.get("t", {}).get("v"), -273.15)
 
         pc  = get_color("pm25", pv)
         nc  = get_color("no2", nv)
         coc = get_color("co", cv)
-        h, t = hv, tv
-        name = point_name
-        
-        t_rounded = round(t)
-        h_rounded = round(h)
-        
-        after_co = f" | {uv_str}" if uv_str else ""
-        return f"{name}: PM2.5{pc}{pv} | NO2{nc}{nv} | CO{coc}{cv}{after_co} | 🌡️{t_rounded}°C | 💧{h_rounded}%"
+
+        parts = [f"{point_name}:"]
+        if pv >= 0:
+            parts.append(f"PM2.5{pc}{pv}")
+        if nv >= 0:
+            parts.append(f"NO2{nc}{nv}")
+        if cv >= 0:
+            parts.append(f"CO{coc}{cv}")
+        if uv_str:
+            parts.append(uv_str)
+        if tv > -273.15:
+            parts.append(f"🌡️{round(tv)}°C")
+        if hv >= 0:
+            parts.append(f"💧{round(hv)}%")
+        return " | ".join(parts) if len(parts) > 1 else f"{point_name}: —"
     except Exception:
-        return "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1%"
+        return "N/A: —"
 
 def _read_uv_str():
     try:
@@ -183,6 +208,9 @@ def fetch_uv_and_save():
 
 
 if __name__ == "__main__":
+
+    OPENUV_SKIN_TYPE = _parse_skin_type()
+
     fetch_uv_and_save()
     fetch_and_save()
 
