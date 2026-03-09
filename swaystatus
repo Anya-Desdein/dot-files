@@ -5,7 +5,7 @@
 CACHE_DIR="${SWAYSTATUS_DIR:-/tmp/swaystatus/}"
 
 CACHE_FILE="${CACHE_DIR}swaystatus_airquality"
-IS_SUSPENDING_FILE="${CACHE_DIR}swaystatus_is_suspending"
+
 LOW_BATTERY_STATE="${CACHE_DIR}low_battery_notified"
 NOTIFICATION_SENT_FILE="${CACHE_DIR}notification_sent"
 
@@ -13,10 +13,15 @@ BATTERY_FILE="/tmp/energy_poll/battery_left"
 SUSPEND_SCRIPT="$HOME/.local/bin/suspend_to_ram"
 BATTERY="/sys/class/power_supply/BAT0/"
 
+IS_SUSPENDING_FILE="${CACHE_DIR}swaystatus_is_suspending"
+SUSPEND_TRIGGERED_DIR="${CACHE_DIR}swaystatus_suspend_triggered"
+
 mkdir -p "$CACHE_DIR"
 [ ! -f "$CACHE_FILE" ] && touch "$CACHE_FILE"
 [ ! -f "$LOW_BATTERY_STATE" ] && touch "$LOW_BATTERY_STATE"
 [ ! -f "$NOTIFICATION_SENT_FILE" ] && touch "$NOTIFICATION_SENT_FILE"
+
+rmdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null
 
 if ! pgrep -f "swaystatus_aqi.py" > /dev/null; then
     $HOME/.local/bin/swaystatus_aqi.py &
@@ -26,7 +31,7 @@ function get_formatted_air_quality() {
     if [ -f "${CACHE_FILE}_formatted" ]; then
         cat "${CACHE_FILE}_formatted"
     else
-        echo "N/A: PM2.5⚪-1 | NO2⚪-1 | CO⚪-1 | 🌡️-273°C | 💧-1%"
+        echo -n ''
     fi
 }
 
@@ -41,9 +46,6 @@ function low_battery_notification() {
 	else
 		urgency="low"
 	fi
-	# Redirect stdout too: we're inside get_battery_info which is captured by the bar;
-	# D-Bus can print "method return..." to stdout and that would appear after deg_icon.
-	# Run in background so a slow D-Bus round-trip never blocks the bar (which may timeout).
 	( notify-send -u "$urgency" "Battery low: ${battery_level}%!" >/dev/null 2>&1 ) &
 }
 
@@ -53,7 +55,6 @@ function get_battery_info() {
 	info=''
 	[[ ! -d "$BATTERY" ]] && echo -n "?% 🪦?%" && return 0
 
-	# Read and trim sysfs (can be empty or odd after resume)
 	energy_now=$(tr -d '[:space:]' < "$BATTERY/energy_now" 2>/dev/null)
 	energy_full=$(tr -d '[:space:]' < "$BATTERY/energy_full" 2>/dev/null)
 	energy_full_design=$(tr -d '[:space:]' < "$BATTERY/energy_full_design" 2>/dev/null)
@@ -88,9 +89,9 @@ function get_battery_info() {
 		state=$(tr -d '[:space:]' < "$BATTERY/status" 2>/dev/null)
 	fi
 	case "$state" in
-		Full)       state="🔋" ; rm -f "${CACHE_DIR}swaystatus_is_suspending" 2>/dev/null ;;
+		Full)       state="🔋" ; rm -f "${IS_SUSPENDING_FILE}" 2>/dev/null ; rmdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null ;;
 		Discharging|Notcharging) state="♻️" ;;
-		Charging)   state="$CHARGING_ICON" ; rm -f "${CACHE_DIR}swaystatus_is_suspending" 2>/dev/null ;;
+		Charging)   state="$CHARGING_ICON" ; rm -f "${IS_SUSPENDING_FILE}" 2>/dev/null ; rmdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null ;;
 		Unknown)    state="?" ;;
 		*)          state="?" ;;
 	esac
@@ -143,7 +144,8 @@ function get_battery_info() {
 	else
 		echo 0 > "$LOW_BATTERY_STATE" 2>/dev/null
 		echo 0 > "$NOTIFICATION_SENT_FILE" 2>/dev/null
-		rm -f "${CACHE_DIR}swaystatus_is_suspending" 2>/dev/null
+		rm -f "${IS_SUSPENDING_FILE}" 2>/dev/null
+		rmdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null
 	fi 
 	is_low_battery=$(cat "$LOW_BATTERY_STATE" 2>/dev/null || echo "0")
   
@@ -158,9 +160,9 @@ function get_battery_info() {
 
 		if [ -x "$SUSPEND_SCRIPT" ] && [ "$SWAYSTATUS_ENABLE_SUSPEND_TO_RAM" = "TRUE" ]; then
 			if [ "$now" -le 8 ] || [ "${total_minutes:-999}" -lt 10 ]; then
-				if [ ! -f "$IS_SUSPENDING_FILE" ]; then
-					"$SUSPEND_SCRIPT" >/dev/null 2>&1 &
+				if mkdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null; then
 					touch "$IS_SUSPENDING_FILE"
+					"$SUSPEND_SCRIPT" >/dev/null 2>&1 &
 				fi
 			fi
 		fi
@@ -185,7 +187,14 @@ function update_status() {
 	
 	battery_level=$(get_battery_info)
 	date=$(date "+%d %b %Y %H:%M")
-	echo "$aqi_line | $battery_level | $volume_line | $date"	
+	line=""
+	for part in "$aqi_line" "$battery_level" "$volume_line" "$date"; do
+		if [ -n "$part" ]; then
+			[ -n "$line" ] && line="$line | "
+			line="$line$part"
+		fi
+	done
+	echo "${line% | }"
 }
 
 
