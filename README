@@ -1,0 +1,59 @@
+dot-files — i3 status bar & desktop utilities
+==============================================
+
+Shell/Python daemons providing:
+  - Status bar: UV score, air quality, weather, date, sound volume
+  - Suspend to RAM on low battery
+  - Easy screenshots
+  - Night mode
+
+Install: copy scripts to ~/.local/bin/
+         copy config to ~/.config/i3/config
+         run setup-redshift-timers once to enable night mode
+         run remove-redshift-timers to uninstall night mode
+
+CONFIGURATION
+-------------
+
+Fill in swaystatus_env:
+
+  SWAYSTATUS_ENABLE_SUSPEND_TO_RAM
+  WAQI_TOKEN, WAQI_LOCATION
+  OPENUV_TOKEN, OPENUV_LAT, OPENUV_LNG, OPENUV_ALT, OPENUV_SKIN_TYPE
+
+swaystatus_launcher sources swaystatus_env then exec's swaystatus, keeping
+tokens out of the process list.
+
+Volume (upvolstatus writes to SWAYSTATUS_SOUND_EVENT; wire to volume keys):
+
+  bindsym XF86AudioRaiseVolume exec chvol up     && upvolstatus
+  bindsym XF86AudioLowerVolume exec chvol down   && upvolstatus
+  bindsym XF86AudioMute        exec chvol toggle && upvolstatus
+
+
+SUSPEND TO RAM
+--------------
+
+suspend_to_ram  counts down 30 s with critical desktop notifications, then
+                suspends via dbus-send to org.freedesktop.login1.Manager.Suspend.
+                Cancel by creating /tmp/suspend_to_ram/cancel (Mod+Ctrl+c).
+                Called automatically by swaystatus on low-battery.
+
+
+REDSHIFT TIMERS
+---------------
+
+  setup-redshift-timers    installs systemd user timers:
+                             18:30 → redshift -O 2900  (warm/night)
+                             05:30 → redshift -x       (reset/day)
+  remove-redshift-timers   removes them
+
+
+MISC
+----
+
+  scrot-c   area-selection screenshot → xclip clipboard
+            bindsym $mod+shift+s exec scrot-c
+
+  config    i3 config: Mod4, alacritty, dmenu, vim keys, xbacklight,
+            playerctl, 1 px borders
