@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+SYSTEMD_DIR="$HOME/.config/systemd/user"
+UNITS=(redshift-evening.timer redshift-evening.service redshift-morning.timer redshift-morning.service)
+
+for unit in "${UNITS[@]}"; do
+    systemctl --user disable --now "$unit" 2>/dev/null && echo "Disabled $unit" || true
+    rm -f "$SYSTEMD_DIR/$unit" && echo "Removed $unit" || true
+done
+
+systemctl --user daemon-reload
+echo "Done."

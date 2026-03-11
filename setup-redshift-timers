@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -e
+
+SYSTEMD_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SYSTEMD_DIR"
+
+# --- Evening service: redshift -O 2900 at 6:30 ---
+cat > "$SYSTEMD_DIR/redshift-evening.service" <<'EOF'
+[Unit]
+Description=Enable redshift night mode
+
+[Service]
+Type=oneshot
+ExecStart=redshift -O 2900
+EOF
+
+cat > "$SYSTEMD_DIR/redshift-evening.timer" <<'EOF'
+[Unit]
+Description=Warm up screen to night mode at 6:30
+
+[Timer]
+OnCalendar=*-*-* 18:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# --- Morning service: redshift -x at 05:30 ---
+cat > "$SYSTEMD_DIR/redshift-morning.service" <<'EOF'
+[Unit]
+Description=Reset redshift to day mode
+
+[Service]
+Type=oneshot
+ExecStart=redshift -x
+EOF
+
+cat > "$SYSTEMD_DIR/redshift-morning.timer" <<'EOF'
+[Unit]
+Description=Reset screen to day mode at 05:30
+
+[Timer]
+OnCalendar=*-*-* 05:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl --user daemon-reload
+systemctl --user enable --now redshift-evening.timer
+systemctl --user enable --now redshift-morning.timer
+
+echo "Timers enabled. Next trigger times:"
+systemctl --user list-timers redshift-evening.timer redshift-morning.timer
