@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+
+# Prints bar from BAR_FILE (written by swaystatus).
+# Updates when BAR_FILE is modified or on timeout.
+
+# Avoid exiting when swaybar momentarily doesn't read (e.g. on volume key) and we get SIGPIPE.
+trap '' PIPE
+
+# set -x
+
+CACHE_DIR="${SWAYSTATUS_DIR:-/tmp/swaystatus/}"
+BAR_FILE="${CACHE_DIR}swaystatus_ui"
+
+print_bar() {
+    if [ ! -d "$CACHE_DIR" ]; then
+        mkdir -p "$CACHE_DIR"
+    fi
+    if [ -f "$BAR_FILE" ] && [ -s "$BAR_FILE" ]; then
+        cat "$BAR_FILE"
+    else
+        echo ""
+    fi
+}
+
+while true; do
+    print_bar
+    inotifywait -q -e modify,close_write -t 45 "$BAR_FILE" -o /dev/null 2>/dev/null || true
+done

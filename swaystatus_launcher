@@ -1,19 +1,6 @@
 #!/usr/bin/sh
 
-# Private environment variables for swaystatus
+# Load env
+. "$HOME/.local/bin/swaystatus_env"
 
-export SWAYSTATUS_DIR="/tmp/swaystatus/"
-export SWAYSTATUS_BIN_DIR="$HOME/.local/bin/"
-
-export SWAYSTATUS_ENABLE_SUSPEND_TO_RAM="TRUE"
-
-export WAQI_TOKEN="mytoken"
-export WAQI_LOCATION="mylocation"
-
-export OPENUV_TOKEN="mytoken"
-export OPENUV_LAT="mylat"
-export OPENUV_LNG="mylng"
-export OPENUV_ALT="myalt"
-export OPENUV_SKIN_TYPE="skin_type"
-
-exec $HOME/.local/bin/swaystatus
+exec "${SWAYSTATUS_BIN_DIR}swaystatus"

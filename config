@@ -186,7 +186,7 @@ bindsym $mod+r mode "resize"
 # finds out, if available)
 bar {
 	position top
-        status_command $HOME/.local/bin/swaystatus_launcher
+        status_command $HOME/.local/bin/swaystatus_ui
 }
 
 # Colors
@@ -196,3 +196,5 @@ for_window [class="^.*"] border pixel 1
 
 # Start energy monitoring daemon
 exec --no-startup-id $HOME/.local/bin/energy_poll
+
+exec --no-startup-id sh -c '. $HOME/.local/bin/swaystatus_env && exec $HOME/.local/bin/swaystatus_launcher'

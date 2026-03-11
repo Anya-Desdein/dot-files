@@ -4,17 +4,23 @@
 
 CACHE_DIR="${SWAYSTATUS_DIR:-/tmp/swaystatus/}"
 
-CACHE_FILE="${CACHE_DIR}swaystatus_airquality"
+BAR_FILE="${CACHE_DIR}swaystatus_ui"
 
+SOUND_EVENT="${SWAYSTATUS_SOUND_EVENT:-/tmp/sound_changed_event}"
+POWER_EVENT="${SWAYSTATUS_POWER_EVENT:-/tmp/power_changed_event}"
+
+BATTERY_FILE="${SWAYSTATUS_BATTERY_FILE:-/tmp/energy_poll/battery_left}"
+SUSPEND_SCRIPT="${SWAYSTATUS_SUSPEND_SCRIPT:-$HOME/.local/bin/suspend_to_ram}"
+
+BATTERY="${SWAYSTATUS_BATTERY:-/sys/class/power_supply/BAT0/}"
+
+CACHE_FILE="${CACHE_DIR}swaystatus_airquality"
 LOW_BATTERY_STATE="${CACHE_DIR}low_battery_notified"
 NOTIFICATION_SENT_FILE="${CACHE_DIR}notification_sent"
-
-BATTERY_FILE="/tmp/energy_poll/battery_left"
-SUSPEND_SCRIPT="$HOME/.local/bin/suspend_to_ram"
-BATTERY="/sys/class/power_supply/BAT0/"
-
 IS_SUSPENDING_FILE="${CACHE_DIR}swaystatus_is_suspending"
 SUSPEND_TRIGGERED_DIR="${CACHE_DIR}swaystatus_suspend_triggered"
+
+BIN_DIR="${SWAYSTATUS_BIN_DIR:-$HOME/.local/bin}"
 
 mkdir -p "$CACHE_DIR"
 [ ! -f "$CACHE_FILE" ] && touch "$CACHE_FILE"
@@ -24,7 +30,7 @@ mkdir -p "$CACHE_DIR"
 rmdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null
 
 if ! pgrep -f "swaystatus_aqi.py" > /dev/null; then
-    $HOME/.local/bin/swaystatus_aqi.py &
+    "${BIN_DIR}/swaystatus_aqi.py" &
 fi
 
 function get_formatted_air_quality() {
@@ -38,9 +44,9 @@ function get_formatted_air_quality() {
 function low_battery_notification() {
 	battery_level=$1
 	time_left_minutes=$2
-	
+
 	time_left_minutes=${time_left_minutes:-999}
-	
+
 	if [ "$battery_level" -le 8 ] || [ "$time_left_minutes" -le 12 ]; then
 		urgency="critical"
 	else
@@ -106,7 +112,7 @@ function get_battery_info() {
 
 	time_left=""
 	total_minutes=""
-	
+
 	if [ -f "$BATTERY_FILE" ]; then
 		total_minutes=$(cat "$BATTERY_FILE" 2>/dev/null)
 
@@ -146,9 +152,9 @@ function get_battery_info() {
 		echo 0 > "$NOTIFICATION_SENT_FILE" 2>/dev/null
 		rm -f "${IS_SUSPENDING_FILE}" 2>/dev/null
 		rmdir "${SUSPEND_TRIGGERED_DIR}" 2>/dev/null
-	fi 
+	fi
 	is_low_battery=$(cat "$LOW_BATTERY_STATE" 2>/dev/null || echo "0")
-  
+
 	if  [ "$is_low_battery" = 1 ]; then
 		notification_sent=$(cat "$NOTIFICATION_SENT_FILE" 2>/dev/null || echo "0")
 
@@ -166,7 +172,7 @@ function get_battery_info() {
 				fi
 			fi
 		fi
-		
+
 	fi
 
 	echo -n "$state$now%$time_left 🪦$degradation%$deg_icon"
@@ -175,16 +181,16 @@ function get_battery_info() {
 function update_status() {
 	aqi_line=$(get_formatted_air_quality)
 
-	if [ -f "/tmp/sound_changed_event" ]; then
-		volume_line=$(</tmp/sound_changed_event)
+	if [ -f "$SOUND_EVENT" ]; then
+		volume_line=$(<"$SOUND_EVENT")
 	else
 		volume_line=""
 	fi
-	
+
 	if [ "$(cat "$LOW_BATTERY_STATE" 2>/dev/null)" != "1" ]; then
 		echo "0" > "$NOTIFICATION_SENT_FILE" 2>/dev/null
 	fi
-	
+
 	battery_level=$(get_battery_info)
 	date=$(date "+%d %b %Y %H:%M")
 	line=""
@@ -198,16 +204,18 @@ function update_status() {
 }
 
 
-$HOME/.local/bin/upvolstatus
+"${BIN_DIR}/upvolstatus" &
 
-touch /tmp/power_changed_event
+touch "$POWER_EVENT"
 
-update_status
-touch /tmp/sound_changed_event
+BAR_FILE_TMP="${BAR_FILE}.tmp"
+write_bar() { update_status > "$BAR_FILE_TMP" && mv -f "$BAR_FILE_TMP" "$BAR_FILE"; }
 
+write_bar
+touch "$SOUND_EVENT"
 
 while :
 do
-	inotifywait -q -e modify,close_write -t 30 /tmp/power_changed_event /tmp/sound_changed_event -o /dev/null 2>/dev/null
-	update_status
+	inotifywait -q -e modify,close_write -t 30 "$POWER_EVENT" "$SOUND_EVENT" -o /dev/null 2>/dev/null
+	write_bar
 done

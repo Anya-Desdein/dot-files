@@ -1,0 +1,17 @@
+# Private environment variables for swaystatus
+
+export SWAYSTATUS_DIR="/tmp/swaystatus/"
+export SWAYSTATUS_BIN_DIR="$HOME/.local/bin/"
+
+export SWAYSTATUS_SOUND_EVENT="/tmp/sound_changed_event"
+
+export SWAYSTATUS_ENABLE_SUSPEND_TO_RAM="TRUE"
+
+export WAQI_TOKEN="mytoken"
+export WAQI_LOCATION="mylocation"
+
+export OPENUV_TOKEN="mytoken"
+export OPENUV_LAT="mylat"
+export OPENUV_LNG="mylong"
+export OPENUV_ALT="myalt"
+export OPENUV_SKIN_TYPE="myskin"

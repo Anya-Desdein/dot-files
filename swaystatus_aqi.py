@@ -2,7 +2,9 @@
 import sys
 import json
 import os
+import glob
 import urllib.request
+import urllib.error
 import time
 
 
@@ -19,33 +21,37 @@ URL = f"https://api.waqi.info/feed/{WAQI_LOCATION}/?token={WAQI_TOKEN}"
 
 # OpenUV configuration
 OPENUV_TOKEN = os.environ.get("OPENUV_TOKEN", "")
-OPENUV_LAT = os.environ.get("OPENUV_LAT", "")
-OPENUV_LNG = os.environ.get("OPENUV_LNG", "")
+
+OPENUV_LAT = os.environ.get("OPENUV_LAT", "37.7749")
+OPENUV_LNG = os.environ.get("OPENUV_LNG", "-122.4194")
 OPENUV_ALT = os.environ.get("OPENUV_ALT", "0")
+
 OPENUV_DATA_FILE = os.path.join(SWAYSTATUS_DIR, "swaystatus_uv")
 OPENUV_FORMATTED_FILE = OPENUV_DATA_FILE + "_formatted"
 OPENUV_LOCATION_NAME = os.environ.get("OPENUV_LOCATION_NAME", "UV")
 
+
+def time_to_burn_min(uv, skin_type):
+    # Minutes to burn at given UVI for Fitzpatrick skin type. Returns None if no risk (UVI 0).
+    mult = SKIN_TYPE_MULT.get(skin_type, SKIN_TYPE_MULT[1])
+    if uv is None or uv <= 0:
+        return None
+    return (200 * mult) / (3 * uv)
+
+
 # Fitzpatrick skin type 1–6; multiplier for time-to-burn: (200 * mult) / (3 * UVI) = minutes
 SKIN_TYPE_MULT = {1: 2.5, 2: 3, 3: 4, 4: 5, 5: 8, 6: 15}
-
-
 def _parse_skin_type():
     try:
         n = int(os.environ.get("OPENUV_SKIN_TYPE", "3").strip())
-        return n if 1 <= n <= 6 else 1
+        return n if 1 <= n <= 6 else 3
     except (ValueError, TypeError):
-        return 1
+        return 3
 
-def get_color(t, v):
-    # Pollutants (AQI scale)
-    if t in ["pm25", "no2", "co", "so2", "pm10", "o3", "aqi"]:
-        return "⚪" if v<=0 else "🔵" if v<=25 else "🟢" if v<=50 else "🟡" if v<=100 else "🟠" if v<=150 else "🔴" if v<=200 else "🟣" if v<=300 else "🟤"
-    
-    return "⚪"
 
 def get_uv_color(uv):
     # WHO UV index scale: 0-2 low, 3-5 moderate, 6-7 high, 8-10 very high, 11+ extreme
+    # Expanded for more granularity
     if uv is None or uv < 0:
         return "⚪"
     if uv <= 1:
@@ -61,28 +67,28 @@ def get_uv_color(uv):
     return "🟣"
 
 
-def time_to_burn_min(uv, skin_type):
-    """Minutes to burn at given UVI for Fitzpatrick skin type. Returns None if no risk (UVI 0)."""
-    mult = SKIN_TYPE_MULT.get(skin_type, SKIN_TYPE_MULT[1])
-    if uv is None or uv <= 0:
-        return None
-    return (200 * mult) / (3 * uv)
+def get_color(t, v):
+    # Pollutants (AQI scale)
+    if t in ["pm25", "no2", "co", "so2", "pm10", "o3"]:
+        return "⚪" if v<=0 else "🔵" if v<=25 else "🟢" if v<=50 else "🟡" if v<=100 else "🟠" if v<=150 else "🔴" if v<=200 else "🟣" if v<=300 else "🟤"
+    
+    return "⚪"
 
 
-def _num_opt(val):
-    """Return float(val) or None if missing/invalid."""
+def _num(val, default=None):
+    # Return float(val), or default if missing/invalid. Omit default for None.
     try:
-        return float(val) if val is not None else None
+        return float(val) if val is not None else default
     except (TypeError, ValueError):
-        return None
+        return default
 
 
 def format_uv(full_data):
     try:
         res = full_data.get("result", {}) if full_data else {}
         
-        uv = _num_opt(res.get("uv"))
-        uv_max = _num_opt(res.get("uv_max"))
+        uv = _num(res.get("uv"), 666)
+        uv_max = _num(res.get("uv_max"), 666)
         OPENUV_SKIN_TYPE = _parse_skin_type()
         
         parts = []
@@ -118,12 +124,6 @@ def format_aqi(full_data, uv_str=None):
         elif "," in point_name:
             point_name = point_name.split(",", 1)[0].strip()
 
-        def _num(val, default):
-            try:
-                return float(val) if val is not None else default
-            except (TypeError, ValueError):
-                return default
-
         pv = _num(d.get("pm25", {}).get("v"), -1)
         nv = _num(d.get("no2", {}).get("v"), -1)
         cv = _num(d.get("co", {}).get("v"), -1)
@@ -147,9 +147,9 @@ def format_aqi(full_data, uv_str=None):
             parts.append(f"🌡️{round(tv)}°C")
         if hv >= 0:
             parts.append(f"💧{round(hv)}%")
-        return " | ".join(parts) if len(parts) > 1 else f"{point_name}: —"
+        return " | ".join(parts) if len(parts) > 1 else ""
     except Exception:
-        return "N/A: —"
+        return ""
 
 def _read_uv_str():
     try:
@@ -161,7 +161,16 @@ def _read_uv_str():
     return None
 
 
-def fetch_and_save():
+def _is_network_error(e):
+    # True if error is likely transient (network not ready, e.g. after reboot).
+    if isinstance(e, urllib.error.URLError):
+        return True
+    if isinstance(e, OSError) and getattr(e, "errno", None) in (-3, None):
+        return True  # errno -3: temporary failure in name resolution
+    return False
+
+
+def fetch_aqi_and_save():
     try:
         with urllib.request.urlopen(URL) as response:
             data = json.load(response)
@@ -171,19 +180,15 @@ def fetch_and_save():
             json.dump(data, f)
         os.rename(tmp_file, SWAYSTATUS_DATA_FILE)
         
-        uv_str = _read_uv_str() or "UV⚪? | UVmax⚪? | 🔥?"
+        uv_str = _read_uv_str() or ""
         formatted = format_aqi(data, uv_str=uv_str)
         tmp_fmt = SWAYSTATUS_FORMATTED_FILE + ".tmp"
         with open(tmp_fmt, "w") as f:
             f.write(formatted)
-        os.rename(tmp_fmt, SWAYSTATUS_FORMATTED_FILE)
-
-        with open(SWAYSTATUS_DATA_FILE, "r") as f:
-            saved_data = json.load(f)
-        format_aqi(saved_data, uv_str=_read_uv_str() or "UV⚪? | UVmax⚪? | 🔥?")
-            
+        os.rename(tmp_fmt, SWAYSTATUS_FORMATTED_FILE)            
     except Exception as e:
-        pass
+        if _is_network_error(e):
+            raise
 
 
 def fetch_uv_and_save():
@@ -203,19 +208,49 @@ def fetch_uv_and_save():
         with open(tmp_fmt, "w") as f:
             f.write(formatted)
         os.rename(tmp_fmt, OPENUV_FORMATTED_FILE)
-    except Exception:
-        pass
+    except Exception as e:
+        if _is_network_error(e):
+            raise
+
+
+def run_until_ok(fn, max_retries=10, delay=1):
+    # Run fn(); on network errors retry up to max_retries times with delay between.
+    for attempt in range(max_retries):
+        try:
+            fn()
+            return
+        except Exception as e:
+            if _is_network_error(e) and attempt < max_retries - 1:
+                time.sleep(delay)
+                continue
+            raise
 
 
 if __name__ == "__main__":
-
-    OPENUV_SKIN_TYPE = _parse_skin_type()
-
-    fetch_uv_and_save()
-    fetch_and_save()
+    os.makedirs(SWAYSTATUS_DIR, exist_ok=True)
+    for f in glob.glob(os.path.join(SWAYSTATUS_DIR, "*.tmp")):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    # After reboot network may not be ready; retry until we get data or give up
+    try:
+        run_until_ok(fetch_uv_and_save)
+    except Exception:
+        pass
+    try:
+        run_until_ok(fetch_aqi_and_save)
+    except Exception:
+        pass
 
     # Loop every 30 minutes (1800 seconds)
     while True:
         time.sleep(1800)
-        fetch_uv_and_save()
-        fetch_and_save()
+        try:
+            fetch_uv_and_save()
+        except Exception:
+            pass
+        try:
+            fetch_aqi_and_save()
+        except Exception:
+            pass
