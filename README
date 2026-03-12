@@ -9,8 +9,9 @@ Shell/Python daemons providing:
 
 Install: copy scripts to ~/.local/bin/
          copy config to ~/.config/i3/config
-         run setup-redshift-timers once to enable night mode
-         run remove-redshift-timers to uninstall night mode
+         run setup-redshift-timers to enable night mode (per-user)
+         run setup-redshift-timers --global to install system-wide (root)
+         run remove-redshift-timers to uninstall (same --global flag)
 
 CONFIGURATION
 -------------
@@ -43,10 +44,12 @@ suspend_to_ram  counts down 30 s with critical desktop notifications, then
 REDSHIFT TIMERS
 ---------------
 
-  setup-redshift-timers    installs systemd user timers:
-                             18:30 → redshift -O 2900  (warm/night)
-                             05:30 → redshift -x       (reset/day)
-  remove-redshift-timers   removes them
+  setup-redshift-timers            installs systemd timers (per-user):
+                                     18:30 → redshift -O 2900  (warm/night)
+                                     05:30 → redshift -x       (reset/day)
+  setup-redshift-timers --global   installs system-wide (requires root)
+  remove-redshift-timers           removes per-user install
+  remove-redshift-timers --global  removes system-wide install (requires root)
 
 
 MISC
