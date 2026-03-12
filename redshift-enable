@@ -1,0 +1,9 @@
+[Unit]
+Description=Warm up screen to night mode at 6:30 p.m.
+
+[Timer]
+OnCalendar=*-*-* 18:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,13 +1,38 @@
 #!/usr/bin/env bash
 set -e
 
-SYSTEMD_DIR="$HOME/.config/systemd/user"
-UNITS=(redshift-evening.timer redshift-evening.service redshift-morning.timer redshift-morning.service)
+GLOBAL=0
 
-for unit in "${UNITS[@]}"; do
-    systemctl --user disable --now "$unit" 2>/dev/null && echo "Disabled $unit" || true
-    rm -f "$SYSTEMD_DIR/$unit" && echo "Removed $unit" || true
+for arg in "$@"; do
+    case "$arg" in
+        --global|--system) GLOBAL=1 ;;
+        *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+    esac
 done
 
-systemctl --user daemon-reload
+if (( GLOBAL )); then
+    SYSTEMD_DIR="/etc/systemd/system"
+    SYSTEMCTL="systemctl"
+    if [[ $EUID -ne 0 ]]; then
+        echo "Global uninstall requires root. Re-run with sudo." >&2
+        exit 1
+    fi
+else
+    SYSTEMD_DIR="$HOME/.config/systemd/user"
+    SYSTEMCTL="systemctl --user"
+fi
+
+UNITS=(
+    redshift-enable.timer
+    redshift-enable.service
+    redshift-disable.timer
+    redshift-disable.service
+)
+
+for unit in "${UNITS[@]}"; do
+    $SYSTEMCTL disable --now "$unit" 2>/dev/null && echo "Disabled $unit" || true
+    rm -f "$SYSTEMD_DIR/$unit" && echo "Removed $SYSTEMD_DIR/$unit" || true
+done
+
+$SYSTEMCTL daemon-reload
 echo "Done."

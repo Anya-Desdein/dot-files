@@ -1,11 +1,32 @@
 #!/usr/bin/env bash
 set -e
 
-SYSTEMD_DIR="$HOME/.config/systemd/user"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GLOBAL=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --global|--system) GLOBAL=1 ;;
+        *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+    esac
+done
+
+if (( GLOBAL )); then
+    SYSTEMD_DIR="/etc/systemd/system"
+    SYSTEMCTL="systemctl"
+    if [[ $EUID -ne 0 ]]; then
+        echo "Global installation requires root. Re-run with sudo." >&2
+        exit 1
+    fi
+else
+    SYSTEMD_DIR="$HOME/.config/systemd/user"
+    SYSTEMCTL="systemctl --user"
+fi
+
 mkdir -p "$SYSTEMD_DIR"
 
-# --- Evening service: redshift -O 2900 at 6:30 ---
-cat > "$SYSTEMD_DIR/redshift-evening.service" <<'EOF'
+install -m644 "$SCRIPT_DIR/redshift-enable" "$SYSTEMD_DIR/redshift-enable.timer"
+cat > "$SYSTEMD_DIR/redshift-enable.service" <<'EOF'
 [Unit]
 Description=Enable redshift night mode
 
@@ -14,20 +35,8 @@ Type=oneshot
 ExecStart=redshift -O 2900
 EOF
 
-cat > "$SYSTEMD_DIR/redshift-evening.timer" <<'EOF'
-[Unit]
-Description=Warm up screen to night mode at 6:30
-
-[Timer]
-OnCalendar=*-*-* 18:30:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# --- Morning service: redshift -x at 05:30 ---
-cat > "$SYSTEMD_DIR/redshift-morning.service" <<'EOF'
+install -m644 "$SCRIPT_DIR/redshift-disable" "$SYSTEMD_DIR/redshift-disable.timer"
+cat > "$SYSTEMD_DIR/redshift-disable.service" <<'EOF'
 [Unit]
 Description=Reset redshift to day mode
 
@@ -36,21 +45,9 @@ Type=oneshot
 ExecStart=redshift -x
 EOF
 
-cat > "$SYSTEMD_DIR/redshift-morning.timer" <<'EOF'
-[Unit]
-Description=Reset screen to day mode at 05:30
-
-[Timer]
-OnCalendar=*-*-* 05:30:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-systemctl --user daemon-reload
-systemctl --user enable --now redshift-evening.timer
-systemctl --user enable --now redshift-morning.timer
+$SYSTEMCTL daemon-reload
+$SYSTEMCTL enable --now redshift-enable.timer
+$SYSTEMCTL enable --now redshift-disable.timer
 
 echo "Timers enabled. Next trigger times:"
-systemctl --user list-timers redshift-evening.timer redshift-morning.timer
+$SYSTEMCTL list-timers redshift-enable.timer redshift-disable.timer
