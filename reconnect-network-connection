@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-nmcli -t -f NAME connection show --active | while read -r name; do
+nmcli -t -f NAME connection show --active | grep -v '^lo$' | while read -r name; do
     nmcli connection down "$name"
     nmcli connection up "$name"
     notify-send "Connection $name refreshed" --urgency=low
