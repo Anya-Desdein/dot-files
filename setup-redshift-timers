@@ -25,29 +25,10 @@ fi
 
 mkdir -p "$SYSTEMD_DIR"
 
-install -m644 "$SCRIPT_DIR/redshift-enable" "$SYSTEMD_DIR/redshift-enable.timer"
-cat > "$SYSTEMD_DIR/redshift-enable.service" <<'EOF'
-[Unit]
-Description=Enable redshift night mode
-
-[Service]
-Type=oneshot
-ExecStart=redshift -O 2900
-EOF
-
-install -m644 "$SCRIPT_DIR/redshift-disable" "$SYSTEMD_DIR/redshift-disable.timer"
-cat > "$SYSTEMD_DIR/redshift-disable.service" <<'EOF'
-[Unit]
-Description=Reset redshift to day mode
-
-[Service]
-Type=oneshot
-ExecStart=redshift -x
-EOF
+install -m755 "$SCRIPT_DIR/redshift-daemon" "$HOME/.local/bin/redshift-daemon"
+install -m644 "$SCRIPT_DIR/redshift.service" "$SYSTEMD_DIR/redshift.service"
 
 $SYSTEMCTL daemon-reload
-$SYSTEMCTL enable --now redshift-enable.timer
-$SYSTEMCTL enable --now redshift-disable.timer
+$SYSTEMCTL enable --now redshift.service
 
-echo "Timers enabled. Next trigger times:"
-$SYSTEMCTL list-timers redshift-enable.timer redshift-disable.timer
+echo "redshift.service enabled and started."

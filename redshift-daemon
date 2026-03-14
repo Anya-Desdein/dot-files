@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+NIGHT_H=18 NIGHT_M=30
+DAY_H=5    DAY_M=30
+
+night_s=$(( NIGHT_H * 3600 + NIGHT_M * 60 ))
+day_s=$(( DAY_H * 3600 + DAY_M * 60 ))
+
+while true; do
+    now_s=$(( $(date +%-H) * 3600 + $(date +%-M) * 60 + $(date +%-S) ))
+
+    if (( now_s >= night_s || now_s < day_s )); then
+        redshift -O 2900
+        if (( now_s < day_s )); then
+            sleep_s=$(( day_s - now_s ))
+        else
+            sleep_s=$(( 86400 - now_s + day_s ))
+        fi
+    else
+        redshift -x
+        sleep_s=$(( night_s - now_s ))
+    fi
+
+    sleep $sleep_s
+done

@@ -22,17 +22,9 @@ else
     SYSTEMCTL="systemctl --user"
 fi
 
-UNITS=(
-    redshift-enable.timer
-    redshift-enable.service
-    redshift-disable.timer
-    redshift-disable.service
-)
-
-for unit in "${UNITS[@]}"; do
-    $SYSTEMCTL disable --now "$unit" 2>/dev/null && echo "Disabled $unit" || true
-    rm -f "$SYSTEMD_DIR/$unit" && echo "Removed $SYSTEMD_DIR/$unit" || true
-done
+$SYSTEMCTL disable --now redshift-sched.service 2>/dev/null && echo "Disabled redshift-sched.service" || true
+rm -f "$SYSTEMD_DIR/redshift-sched.service" && echo "Removed $SYSTEMD_DIR/redshift-sched.service" || true
+rm -f "$HOME/.local/bin/redshift-daemon" && echo "Removed $HOME/.local/bin/redshift-daemon" || true
 
 $SYSTEMCTL daemon-reload
 echo "Done."
