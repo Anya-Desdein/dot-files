@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply redshift state on login
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+Environment=DISPLAY=:0
+ExecStart=/bin/bash -c 'hhmm=$(date +%%H%%M); if (( 10#$$hhmm >= 1830 || 10#$$hhmm < 530 )); then redshift -O 2900; else redshift -x; fi'
+
+[Install]
+WantedBy=graphical-session.target
