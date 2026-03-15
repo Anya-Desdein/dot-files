@@ -25,10 +25,13 @@ fi
 
 mkdir -p "$SYSTEMD_DIR"
 
-install -m755 "$SCRIPT_DIR/redshift-daemon" "$HOME/.local/bin/redshift-daemon"
-install -m644 "$SCRIPT_DIR/redshift.service" "$SYSTEMD_DIR/redshift.service"
+mkdir -p "$HOME/.local/bin"
+[[ "$SCRIPT_DIR/redshift-daemon" -ef "$HOME/.local/bin/redshift-daemon" ]] \
+    || install -m755 "$SCRIPT_DIR/redshift-daemon" "$HOME/.local/bin/redshift-daemon"
+[[ "$SCRIPT_DIR/redshift-sched.service" -ef "$SYSTEMD_DIR/redshift-sched.service" ]] \
+    || install -m644 "$SCRIPT_DIR/redshift-sched.service" "$SYSTEMD_DIR/redshift-sched.service"
 
 $SYSTEMCTL daemon-reload
-$SYSTEMCTL enable --now redshift.service
+$SYSTEMCTL enable --now redshift-sched.service
 
-echo "redshift.service enabled and started."
+echo "redshift-sched.service enabled and started."
