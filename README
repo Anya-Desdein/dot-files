@@ -41,15 +41,56 @@ suspend_to_ram  counts down 30 s with critical desktop notifications, then
                 Called automatically by swaystatus on low-battery.
 
 
-REDSHIFT TIMERS
----------------
+REDSHIFT
+--------
 
-  setup-redshift-timers            installs systemd timers (per-user):
-                                     18:30 → redshift -O 2900  (warm/night)
-                                     05:30 → redshift -x       (reset/day)
-  setup-redshift-timers --global   installs system-wide (requires root)
-  remove-redshift-timers           removes per-user install
-  remove-redshift-timers --global  removes system-wide install (requires root)
+  redshift-daemon               long-running loop that watches the clock and
+                                calls redshift -O 2900 (warm) from 18:30 and
+                                redshift -x (reset) from 05:30, sleeping until
+                                the next transition.
+
+  redshift-init.service         oneshot systemd service; applies the correct
+                                redshift state immediately at graphical-session
+                                login (so the screen is never wrong after unlock).
+
+  redshift-sched.service        persistent systemd service that runs
+                                redshift-daemon; restarts on failure.
+
+  setup-redshift-timers           installs redshift-daemon to ~/.local/bin and
+                                  redshift-sched.service to the systemd user
+                                  directory, then enables and starts the service.
+
+  setup-redshift-timers --global  same, system-wide (requires root).
+
+  remove-redshift-timers          disables redshift-sched.service and removes
+                                  both the service file and redshift-daemon.
+
+  remove-redshift-timers --global  same, system-wide (requires root).
+
+
+DISPLAY
+-------
+
+  screen-xrandr-display-below   position laptop screen (eDP1) below external
+                                monitor (HDMI1):
+                                  xrandr --output eDP1 --below HDMI1
+
+
+NETWORK
+-------
+
+  reconnect-network-connection  cycle all active nmcli connections down then
+                                up; sends a low-urgency desktop notification
+                                per connection when done.
+
+
+BATTERY
+-------
+
+  energy_poll   background daemon that samples BAT0/energy_now every 120 s
+                and writes an estimated minutes-remaining value to
+                /tmp/energy_poll/battery_left (used by swaystatus).
+                Override cache dir name via ENERGY_POLL env var.
 
 
 MISC
