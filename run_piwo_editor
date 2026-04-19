@@ -1,0 +1,8 @@
+#!/bin/bash
+# Script to launch PIWO Animation Editor via Wine
+
+# The Wine shortcut path (internal Windows format)
+WINE_SHORTCUT='C:\ProgramData\Microsoft\Windows\Start Menu\Programs\PIWO Animation Editor Czech Republic 2015\PIWO Animation Editor Czech Republic 2015.lnk'
+
+echo "Launching PIWO Animation Editor..."
+wine start "$WINE_SHORTCUT"
