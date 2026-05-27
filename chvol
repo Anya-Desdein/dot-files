@@ -1,0 +1,27 @@
+#!/usr/bin/sh
+
+sinkinfo=$(pactl info)
+[[ "$sinkinfo" =~ Default\ Sink:\ ([a-zA-Z0-9._-]*) ]]
+
+defsink=${BASH_REMATCH[1]}
+
+# 1. Get the current volume as a raw integer (e.g., "45")
+curvol=$(pactl get-sink-volume "$defsink" | awk -F '/' '{print $2}' | tr -d ' %' | xargs)
+
+case "$1" in
+    toggle) 
+        pactl set-sink-mute "$defsink" toggle ;;
+    up) 
+        # 2. Add 5, but cap at 100
+        newvol=$(( curvol + 5 ))
+        [ $newvol -gt 100 ] && newvol=100
+        pactl set-sink-volume "$defsink" "${newvol}%" ;;
+    down) 
+        # 3. Subtract 5, but cap at 0
+        newvol=$(( curvol - 5 ))
+        [ $newvol -lt 0 ] && newvol=0
+        pactl set-sink-volume "$defsink" "${newvol}%" ;;
+esac
+
+$HOME/.local/bin/upvolstatus
+
