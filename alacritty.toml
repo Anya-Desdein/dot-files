@@ -1,0 +1,67 @@
+[colors]
+draw_bold_text_with_bright_colors = true
+
+[colors.bright]
+black = "0x919191"
+blue = "0x60a5ff"
+cyan = "0x00ffff"
+green = "0x00ff00"
+magenta = "0xff00ff"
+red = "0xff0000"
+white = "0xffffff"
+yellow = "0xffff00"
+
+[colors.cursor]
+cursor = "0x00ffff"
+text = "0x2c2c2c"
+
+[colors.dim]
+black = "0x515151"
+blue = "0x5085a5"
+cyan = "0x00a5a5"
+green = "0x00a500"
+magenta = "0xa500a5"
+red = "0xa50000"
+white = "0xa5a5a5"
+yellow = "0xa5a500"
+
+[colors.normal]
+black = "0x717171"
+blue = "0x5075f0"
+cyan = "0x00e5e5"
+green = "0x00e500"
+magenta = "0xe500e5"
+red = "0xe50000"
+white = "0xe5e5e5"
+yellow = "0xe5e500"
+
+[colors.primary]
+background = "0x000000"
+foreground = "0xffffff"
+
+[cursor]
+style = "Block"
+unfocused_hollow = false
+
+[env]
+TERM = "xterm-256color"
+
+[font]
+size = 8.5
+
+[font.normal]
+family = "UbuntuMono"
+style = "Bold"
+
+[window]
+decorations = "none"
+opacity = 1.0
+
+[general]
+live_config_reload = true
+
+# Claude Code Multi-line Shift+Enter Binding
+[[keyboard.bindings]]
+key = "Return"
+mods = "Shift"
+chars = "\u001B\r"
